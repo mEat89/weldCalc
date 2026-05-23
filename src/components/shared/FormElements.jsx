@@ -40,6 +40,30 @@ export function InchInput({ label, value, onChange, min = 0.01, step = 0.0625, i
 }
 
 /**
+ * Standard plate-thickness dropdown built from COMMON_PLATE_T.
+ * Label format is fractional inch only (e.g. 1/2") — the 16ths display
+ * is reserved for the weld leg-size dropdown.
+ */
+export function PlateThicknessSelect({ label, value, onChange, id }) {
+  return (
+    <Field label={label} id={id}>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="form-select compact"
+      >
+        {COMMON_PLATE_T.map((t) => (
+          <option key={t} value={t}>
+            {toFraction(t)}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+}
+
+/**
  * Quick-pick selection grid for standard steel plate thicknesses
  */
 export function PlateQuickPick({ value, onChange }) {

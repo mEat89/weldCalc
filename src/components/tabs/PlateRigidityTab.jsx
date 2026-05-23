@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { HSS_SHAPES, STEEL_GRADES, COMMON_PLATE_T } from "../../constants/steelData";
+import { HSS_SHAPES, STEEL_GRADES } from "../../constants/steelData";
 import { toFraction } from "../../math/weldMath";
 import { calcAnchorTensionAuto, calcMethodB, calcDG1, calcRigidityVerdict } from "../../math/plateMath";
-import { Field, InchInput, PlateQuickPick } from "../shared/FormElements";
+import { Field, InchInput, PlateThicknessSelect } from "../shared/FormElements";
 import { CheckBlock } from "../shared/CheckResults";
 import RigiditySvgDiagram from "../shared/RigiditySvgDiagram";
 
@@ -181,20 +181,7 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
                   })}
                 </select>
               </Field>
-              <Field label="tp (thickness)" id="plate-tp-select">
-                <select
-                  id="plate-tp-select"
-                  value={tp}
-                  onChange={(e) => setTp(parseFloat(e.target.value))}
-                  className="form-select compact"
-                >
-                  {COMMON_PLATE_T.map((t) => (
-                    <option key={t} value={t}>
-                      {toFraction(t)} ({t.toFixed(3)}")
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              <PlateThicknessSelect label="tp (thickness)" value={tp} onChange={setTp} id="plate-tp-select" />
             </div>
           </div>
         </div>

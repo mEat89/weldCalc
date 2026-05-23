@@ -7,7 +7,6 @@ import {
   FACE_TYPES,
   LENGTH_METHODS,
   LOAD_CASES,
-  COMMON_PLATE_T,
 } from "../../constants/steelData";
 import {
   calcWeldMetal,
@@ -19,7 +18,7 @@ import {
   toFraction,
   to16ths,
 } from "../../math/weldMath";
-import { Field, InchInput, PlateQuickPick } from "../shared/FormElements";
+import { Field, PlateThicknessSelect } from "../shared/FormElements";
 import { CheckBlock, WarningBanner } from "../shared/CheckResults";
 import HssSvgDiagram from "../shared/HssSvgDiagram";
 
@@ -331,20 +330,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                     })}
                   </select>
                 </Field>
-                <Field label="Plate tp" id="plate-thickness-select">
-                  <select
-                    id="plate-thickness-select"
-                    value={plateT}
-                    onChange={(e) => setPlateT(parseFloat(e.target.value))}
-                    className="form-select compact"
-                  >
-                    {COMMON_PLATE_T.map((t) => (
-                      <option key={t} value={t}>
-                        {toFraction(t)} ({t.toFixed(3)}")
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                <PlateThicknessSelect label="Plate tp" value={plateT} onChange={setPlateT} id="plate-thickness-select" />
               </div>
             </div>
           ) : (

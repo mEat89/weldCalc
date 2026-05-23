@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { STEEL_GRADES, LEG_SIZES, FEXX_OPTIONS, SHAPE_PRESETS, LOAD_CASES } from "../../constants/steelData";
 import { calcWeldMetal, calcBaseMetal, calcWeldSize, toFraction, to16ths } from "../../math/weldMath";
-import { Field, InchInput } from "../shared/FormElements";
+import { Field, PlateThicknessSelect } from "../shared/FormElements";
 import { CheckBlock } from "../shared/CheckResults";
 import ShapesSvgDiagram from "../shared/ShapesSvgDiagram";
 
@@ -142,7 +142,7 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
           
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <div className="sidebar-two-col-grid">
-              <InchInput label="Member thickness" value={memberT} onChange={setMemberT} id="member-thickness" suppress16ths={true} />
+              <PlateThicknessSelect label="Member thickness" value={memberT} onChange={setMemberT} id="member-thickness" />
               <Field label="Member grade" id="member-grade">
                 <select
                   id="member-grade"
@@ -158,7 +158,7 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
             </div>
             
             <div className="sidebar-two-col-grid">
-              <InchInput label="Plate thickness, tp" value={plateT} onChange={setPlateT} id="plate-thickness" suppress16ths={true} />
+              <PlateThicknessSelect label="Plate thickness, tp" value={plateT} onChange={setPlateT} id="plate-thickness" />
               <Field label="Plate grade" id="plate-grade">
                 <select
                   id="plate-grade"
