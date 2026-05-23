@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { HSS_SHAPES, STEEL_GRADES } from "../../constants/steelData";
+import { HSS_SHAPES, STEEL_GRADES, COMMON_PLATE_T } from "../../constants/steelData";
 import { toFraction } from "../../math/weldMath";
 import { calcAnchorTensionAuto, calcMethodB, calcDG1, calcRigidityVerdict } from "../../math/plateMath";
 import { Field, InchInput, PlateQuickPick } from "../shared/FormElements";
 import { CheckBlock } from "../shared/CheckResults";
+import RigiditySvgDiagram from "../shared/RigiditySvgDiagram";
 
-export default function PlateRigidityTab() {
+export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLegendOpen, setRefsOpen, darkMode, toggleDarkMode }) {
   // Column (HSS) state
   const [columnIdx, setColumnIdx] = useState(61); // HSS 12x8x5/8 default
   const [columnOrientation, setColumnOrientation] = useState("H_along_M"); // H_along_M or B_along_M
@@ -46,7 +47,7 @@ export default function PlateRigidityTab() {
     tAuto = calcAnchorTensionAuto({
       Mu, Pu, anchorOffsetY, Nplate,
     });
-  } catch (e) { tAutoError = e.message; }
+  } catch (e) { tAutoError = e instanceof Error ? e.message : String(e); }
 
   const Tu = tuMode === "manual" ? tuManual : (tAuto ? tAuto.Tu : 0);
   const beffUsed = beffAuto ? Bplate : beff;
@@ -55,329 +56,400 @@ export default function PlateRigidityTab() {
   let mB = null, dg1 = null, errors = [];
   try {
     mB = calcMethodB({ Tu, x, beff: beffUsed, Fyp: plateGrade.fy, tp });
-  } catch (e) { errors.push("Method B: " + e.message); }
+  } catch (e) { errors.push("Method B: " + (e instanceof Error ? e.message : String(e))); }
 
   try {
     dg1 = calcDG1({ Tu, x, beff: beffUsed, Fyp: plateGrade.fy, tp, phi: 0.9 });
-  } catch (e) { errors.push("DG1: " + e.message); }
+  } catch (e) { errors.push("DG1: " + (e instanceof Error ? e.message : String(e))); }
 
   const verdict = (mB && dg1) ? calcRigidityVerdict(mB, dg1) : null;
 
   return (
-    <div className="tab-pane">
-      {/* Column selector card */}
-      <div className="card shadow-sm border-0 mb-4">
-        <div className="card-section-label">Column (HSS)</div>
-        <div className="form-input-grid">
-          <Field label="Shape" id="column-shape">
-            <select
-              id="column-shape"
-              value={columnIdx}
-              onChange={(e) => setColumnIdx(+e.target.value)}
-              className="form-select"
+    <div className="app-layout">
+      {/* 1. Left Sidebar Inputs (Compact) */}
+      <aside className="app-sidebar compact">
+        <div className="app-sidebar-header">
+          <h1>
+            Weld Capacity
+            <span className="version-badge">v2.5</span>
+          </h1>
+          <div className="header-subtitle">
+            AISC DG1 — Base plate rigidity check
+          </div>
+          
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr 0.6fr", gap: "6px", width: "100%", alignItems: "center" }} className="mt-1">
+            <button
+              onClick={() => setLegendOpen(true)}
+              className="btn-legend-trigger"
+              type="button"
+              style={{ padding: "4px 6px", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", height: "26px" }}
             >
-              {HSS_SHAPES.map((s, i) => (
-                <option key={i} value={i}>{s.name}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Column dim ALONG moment axis" helper="Structural orientation layout" id="column-orientation">
-            <select
-              id="column-orientation"
-              value={columnOrientation}
-              onChange={(e) => setColumnOrientation(e.target.value)}
-              className="form-select"
+              📖 Legend
+            </button>
+            <button
+              onClick={() => setRefsOpen(true)}
+              className="btn-legend-trigger"
+              type="button"
+              style={{ padding: "4px 6px", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", height: "26px" }}
             >
-              <option value="H_along_M">H = {column.H}" along M-axis</option>
-              <option value="B_along_M">B = {column.B}" along M-axis</option>
-            </select>
-          </Field>
-        </div>
-      </div>
-
-      {/* Plate geometry card */}
-      <div className="card shadow-sm border-0 mb-4">
-        <div className="card-section-label">Plate geometry &amp; material</div>
-        <div className="form-input-grid">
-          <InchInput label="N (plate dim along M-axis)" value={Nplate} onChange={setNplate} min={1} step={0.5} id="plate-n" />
-          <InchInput
-            label="B (plate dim perpendicular = beam width)"
-            value={Bplate}
-            onChange={(v) => { setBplate(v); if (beffAuto) setBeff(v); }}
-            min={1}
-            step={0.5}
-            id="plate-b"
-          />
-          <InchInput label="t_p (plate thickness)" value={tp} onChange={setTp} min={0.25} step={0.0625} id="plate-tp" />
-        </div>
-        <div className="form-input-grid mt-3">
-          <Field label="Plate material" id="plate-material">
-            <select
-              id="plate-material"
-              value={plateGradeIdx}
-              onChange={(e) => setPlateGradeIdx(+e.target.value)}
-              className="form-select"
+              📚 References
+            </button>
+            <button
+              onClick={toggleDarkMode}
+              className="btn-legend-trigger theme-toggle-btn"
+              type="button"
+              title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              style={{ padding: "4px 6px", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "26px" }}
             >
-              {STEEL_GRADES.filter((g) => g.category === "plate").map((g) => {
-                const idx = STEEL_GRADES.indexOf(g);
-                return <option key={idx} value={idx}>{g.label}</option>;
-              })}
-            </select>
-          </Field>
-          <Field label="Fy / Fu">
-            <input value={`${plateGrade.fy} / ${plateGrade.fu} ksi`} disabled className="form-input disabled" />
-          </Field>
-        </div>
-      </div>
-
-      {/* Applied loads card */}
-      <div className="card shadow-sm border-0 mb-4">
-        <div className="card-section-label">Applied loads on column at plate level</div>
-        <div className="form-input-grid">
-          <Field label="M_u (moment about chosen axis)" helper="ft·kip — auto-converted to kip·in">
-            <input
-              type="number"
-              value={Mu_ftkip}
-              onChange={(e) => setMu_ftkip(+e.target.value)}
-              className="form-input"
-              step="0.1"
-            />
-          </Field>
-          <Field label="P_u (axial)" helper="kip; positive = compression">
-            <input
-              type="number"
-              value={Pu}
-              onChange={(e) => setPu(+e.target.value)}
-              className="form-input"
-              step="0.1"
-            />
-          </Field>
-          <Field label="V_u (shear, informational)" helper="kip; not used in plate rigidity check">
-            <input
-              type="number"
-              value={Vu}
-              onChange={(e) => setVu(+e.target.value)}
-              className="form-input"
-              step="0.1"
-            />
-          </Field>
-        </div>
-        <div className="length-mode-description">
-          M_u = {Mu_ftkip} ft·kip = <strong>{Mu.toFixed(0)} kip·in</strong>. Eccentricity e = M/P ={" "}
-          {Pu > 0.001 ? (Mu / Pu).toFixed(1) : "→ ∞"} in. Kern boundary limit N/6 = {(Nplate / 6).toFixed(2)} in.
-        </div>
-      </div>
-
-      {/* Anchor row geometry card */}
-      <div className="card shadow-sm border-0 mb-4">
-        <div className="card-section-label">Anchor row geometry (tension side)</div>
-        <div className="form-input-grid">
-          <InchInput
-            label="Anchor row offset y (from plate center along N)"
-            value={anchorOffsetY}
-            onChange={setAnchorOffsetY}
-            min={0.25}
-            step={0.25}
-            id="anchor-y"
-          />
-          <Field label="Cantilever x (HSS face → anchor)">
-            <input value={`${x.toFixed(2)} in`} disabled className="form-input disabled" />
-          </Field>
-          <Field label="b_eff (effective plate width)">
-            <div className="beff-input-row">
-              <input
-                type="number"
-                value={beffAuto ? Bplate : beff}
-                disabled={beffAuto}
-                onChange={(e) => setBeff(+e.target.value)}
-                className={`form-input ${beffAuto ? "disabled" : ""}`}
-                step="0.25"
-              />
-              <button onClick={() => setBeffAuto(!beffAuto)} className="btn-auto-manual" type="button">
-                {beffAuto ? "Auto" : "Manual"}
-              </button>
-            </div>
-          </Field>
-        </div>
-      </div>
-
-      {/* Anchor row tension demand */}
-      <div className="card shadow-sm border-0 mb-4">
-        <div className="card-section-label">Anchor row tension demand T_u</div>
-        <div className="toggle-btn-grid">
-          <button
-            onClick={() => setTuMode("auto")}
-            className={`toggle-option-btn ${tuMode === "auto" ? "active" : ""}`}
-            type="button"
-          >
-            <div className="btn-main-label">Auto-estimate from M, P</div>
-            <div className="btn-sub-label">Rigid-plate equilibrium (simplified)</div>
-          </button>
-          <button
-            onClick={() => setTuMode("manual")}
-            className={`toggle-option-btn ${tuMode === "manual" ? "active" : ""}`}
-            type="button"
-          >
-            <div className="btn-main-label">Manual override</div>
-            <div className="btn-sub-label">Enter T_u from Hilti Profis report or other solvers</div>
-          </button>
+              {darkMode ? "☀️" : "🌙"}
+            </button>
+          </div>
         </div>
 
-        {tuMode === "manual" && (
-          <div className="form-input-grid mt-3">
-            <Field label="T_u (anchor row tension)" helper="kip — sum on the tension-side anchor row">
-              <input
-                type="number"
-                value={tuManual}
-                onChange={(e) => setTuManual(+e.target.value)}
-                className="form-input"
-                step="0.1"
-              />
+        {/* Tab selection buttons (Horizontal Grid) */}
+        <nav className="tab-bar-horizontal">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`tab-nav-btn-horizontal ${activeTab === t.id ? "active" : ""}`}
+              type="button"
+            >
+              {t.id === "hss" ? "HSS" : t.id === "standard" ? "Standard" : "Rigidity"}
+            </button>
+          ))}
+        </nav>
+
+        {/* Column HSS selector card */}
+        <div className="card compact shadow-sm border-0">
+          <div className="card-section-label">Column (HSS)</div>
+          
+          <div className="sidebar-two-col-grid">
+            <Field label="Shape" id="column-shape">
+              <select
+                id="column-shape"
+                value={columnIdx}
+                onChange={(e) => setColumnIdx(+e.target.value)}
+                className="form-select compact"
+              >
+                {HSS_SHAPES.map((s, i) => (
+                  <option key={i} value={i}>{s.name}</option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Orientation" id="column-orientation">
+              <select
+                id="column-orientation"
+                value={columnOrientation}
+                onChange={(e) => setColumnOrientation(e.target.value)}
+                className="form-select compact"
+              >
+                <option value="H_along_M">H={column.H}" along M</option>
+                <option value="B_along_M">B={column.B}" along M</option>
+              </select>
             </Field>
           </div>
-        )}
+        </div>
 
-        {tuMode === "auto" && tAuto && (
-          <div className="length-mode-description mt-3">
-            d_lever = anchor_y + (N/2 − N·5%) = {anchorOffsetY} + ({Nplate/2} − {tAuto.bearingInset.toFixed(2)}) = <strong>{tAuto.dLever.toFixed(2)} in</strong><br />
-            T_u_raw = M/d − P = {Mu.toFixed(0)}/{tAuto.dLever.toFixed(2)} − {Pu} = <strong>{tAuto.TuRaw.toFixed(2)} kip</strong>
-            {tAuto.noTension && <span className="no-tension-indicator">  → no tension on anchors</span>}
-            <br />
-            <span className="tu-val-used">T_u used in checks = {tAuto.Tu.toFixed(2)} kip</span>
-            <div className="estimate-note mt-1">
-              Note: For higher-precision comparison, run a Profis rigid-plate analysis and input the actual anchor row tension sum via Manual override.
+        {/* Plate geometry card */}
+        <div className="card compact shadow-sm border-0">
+          <div className="card-section-label">Plate geometry &amp; material</div>
+          
+          <div className="sidebar-two-col-grid">
+            <InchInput label="N (length along M)" value={Nplate} onChange={setNplate} min={1} step={0.5} id="plate-n" />
+            <InchInput
+              label="B (width perp to M)"
+              value={Bplate}
+              onChange={(v) => { setBplate(v); if (beffAuto) setBeff(v); }}
+              min={1}
+              step={0.5}
+              id="plate-b"
+            />
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
+            <div className="sidebar-two-col-grid">
+              <Field label="Plate material" id="plate-material">
+                <select
+                  id="plate-material"
+                  value={plateGradeIdx}
+                  onChange={(e) => setPlateGradeIdx(+e.target.value)}
+                  className="form-select compact"
+                >
+                  {STEEL_GRADES.filter((g) => g.category === "plate").map((g) => {
+                    const idx = STEEL_GRADES.indexOf(g);
+                    return <option key={idx} value={idx}>{g.shortLabel}</option>;
+                  })}
+                </select>
+              </Field>
+              <InchInput label="tp (thickness)" value={tp} onChange={setTp} min={0.25} step={0.0625} id="plate-tp" />
+            </div>
+            <div>
+              <PlateQuickPick value={tp} onChange={setTp} />
             </div>
           </div>
-        )}
-        {tAutoError && <div className="error-alert mt-2"><strong>Tension error:</strong> {tAutoError}</div>}
-      </div>
-
-      {/* Design method */}
-      <div className="card shadow-sm border-0 mb-4">
-        <div className="card-section-label">Design method</div>
-        <div className="toggle-btn-grid">
-          <button
-            onClick={() => setMethod("lrfd")}
-            className={`toggle-option-btn ${method === "lrfd" ? "active" : ""}`}
-            type="button"
-          >
-            <div className="btn-main-label">LRFD</div>
-            <div className="btn-sub-label">DG1 uses φ = 0.90</div>
-          </button>
-          <button
-            onClick={() => setMethod("asd")}
-            className={`toggle-option-btn ${method === "asd" ? "active" : ""}`}
-            type="button"
-          >
-            <div className="btn-main-label">ASD</div>
-            <div className="btn-sub-label">(informational; DG1 typically LRFD)</div>
-          </button>
         </div>
-      </div>
 
-      {errors.length > 0 && errors.map((e, i) => <div key={i} className="error-alert mb-3">{e}</div>)}
-
-      {/* Check 1: Method B (elastic plate bending) */}
-      {mB && (
-        <CheckBlock
-          title="Check 1 — Method B: Elastic Plate Bending"
-          codeRef="σmax = 6·Tu·x / (beff·t²) ≤ Fy  (elastic stress limits)"
-          traceSteps={mB.trivial ? [
-            { eq: "T_u = 0 → no tension demand",
-              codeRef: "Skipped — no anchor tension",
-              value: "trivially OK" },
-          ] : [
-            { eq: `σ_max = 6 · T_u · x / (b_eff · t_p²)`,
-              codeRef: "Elastic bending stress at column face boundary",
-              value: `${mB.sigmaMax.toFixed(2)} ksi` },
-            { eq: `     = 6 · ${Tu.toFixed(2)} · ${x.toFixed(2)} / (${beffUsed} · ${tp}²)`,
-              codeRef: "Substituted engineering metrics",
-              value: `${mB.sigmaMax.toFixed(2)} ksi` },
-            { eq: `vs F_yp = ${plateGrade.fy} ksi`,
-              codeRef: "Plate material yield strength",
-              value: `DCR = ${mB.DCR.toFixed(3)}` },
-            { eq: `t_req (elastic) = √(6·Tu·x / (beff·Fy))`,
-              codeRef: "Solving stress equation for thickness",
-              value: `${mB.tReq.toFixed(3)} in` },
-          ]}
-          statCards={[
-            { label: "σ_max", value: mB.trivial ? "—" : `${mB.sigmaMax.toFixed(2)} ksi` },
-            { label: "F_yp", value: `${plateGrade.fy} ksi` },
-            { label: "DCR (σ/Fy)", value: mB.trivial ? "—" : mB.DCR.toFixed(3) },
-          ]}
-          checkProps={{
-            status: mB.pass ? "OK" : "NG",
-            demand: mB.sigmaMax,
-            cap: plateGrade.fy,
-            dcr: mB.DCR,
-            label: mB.pass
-              ? "Plate stays elastic under Tu — supports rigid-plate kinematic assumption"
-              : "Plate yields locally under Tu — rigid-plate assumption violated",
-          }}
-        />
-      )}
-
-      {/* Check 2: DG1 §3.4 */}
-      {dg1 && (
-        <CheckBlock
-          title="Check 2 — AISC DG1 §3.4 Plastic Cantilever (with φ)"
-          codeRef="AISC Design Guide 1, Eq. 3.4.7 form: t ≥ √(4·Tu·x / (φ·Fy·beff))"
-          traceSteps={dg1.trivial ? [
-            { eq: "T_u = 0 → no tension demand",
-              codeRef: "Skipped — no anchor tension",
-              value: "trivially OK" },
-          ] : [
-            { eq: `t_req = √(4 · T_u · x / (φ · F_yp · b_eff))`,
-              codeRef: "DG1 §3.4 plastic moment per unit width with φ=0.9",
-              value: `${dg1.tReq.toFixed(3)} in` },
-            { eq: `     = √(4 · ${Tu.toFixed(2)} · ${x.toFixed(2)} / (0.9 · ${plateGrade.fy} · ${beffUsed}))`,
-              codeRef: "Substituted design metrics",
-              value: `${dg1.tReq.toFixed(3)} in` },
-            { eq: `t_provided = ${tp} in`,
-              codeRef: "Provided plate thickness",
-              value: `${tp} in` },
-          ]}
-          statCards={[
-            { label: "t_req (DG1)", value: dg1.trivial ? "—" : `${dg1.tReq.toFixed(3)} in` },
-            { label: "t_provided", value: `${tp} in` },
-            { label: "DCR (req/prov)", value: dg1.trivial ? "—" : dg1.DCR.toFixed(3) },
-          ]}
-          checkProps={{
-            status: dg1.pass ? "OK" : "NG",
-            demand: dg1.tReq,
-            cap: tp,
-            dcr: dg1.DCR,
-            label: dg1.pass
-              ? "Plate adequate per DG1 §3.4 limits"
-              : "Plate fails DG1 §3.4 — base plate yields plastically, not rigid",
-          }}
-        />
-      )}
-
-      {/* Rigidity Verdict Panel */}
-      {verdict && (
-        <div className={`verdict-summary-card ${verdict.color === "ok" ? "pass" : "fail"}`}>
-          <div className="verdict-title">
-            Rigidity verdict: {verdict.verdict}
-            <span className="verdict-details">
-              Method B {mB.pass ? "✓" : "✗"}  ·  DG1 {dg1.pass ? "✓" : "✗"}
-            </span>
+        {/* Design method */}
+        <div className="card compact shadow-sm border-0">
+          <div className="card-section-label">Design method</div>
+          <div className="toggle-btn-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+            <button
+              onClick={() => setMethod("lrfd")}
+              className={`toggle-option-btn compact ${method === "lrfd" ? "active" : ""}`}
+              type="button"
+              style={{ padding: "6px", fontSize: "11px" }}
+            >
+              <div className="btn-main-label" style={{ fontSize: "11px", fontWeight: "700" }}>LRFD (φ=0.90)</div>
+            </button>
+            <button
+              onClick={() => setMethod("asd")}
+              className={`toggle-option-btn compact ${method === "asd" ? "active" : ""}`}
+              type="button"
+              style={{ padding: "6px", fontSize: "11px" }}
+            >
+              <div className="btn-main-label" style={{ fontSize: "11px", fontWeight: "700" }}>ASD (info)</div>
+            </button>
           </div>
-          <div className="verdict-note">{verdict.note}</div>
         </div>
-      )}
+      </aside>
 
-      {/* Engineering Footnote Card */}
-      <div className="card shadow-sm border-0 mb-4">
-        <div className="card-section-label">Notes on base plate rigidity analysis</div>
-        <ul className="notes-list">
-          <li><strong>Method B (elastic) is more stringent than DG1 (plastic with φ).</strong> Method B requires the plate to stay elastic under T_u (σ ≤ F_y). DG1 accepts plastic section modulus (Z = b·t²/4) and applies φ = 0.9, allowing some controlled yielding. The ratio between the two t_req values is √(6/(4/0.9)) ≈ 1.16 — Method B asks for ~16% more thickness.</li>
-          <li><strong>Method B is the elastic-behavior test.</strong> If the plate yields locally under T_u, the rigid-plate kinematic assumption (planar plate motion) breaks down. CBFEM will then show anchor reactions different from the rigid-plate hand calc — sometimes by factors of 2–3x on the critical anchors.</li>
-          <li><strong>DG1 alone passing is not sufficient evidence of rigidity.</strong> DG1 uses the rigid-plate-derived T_u as input to its own check — self-referential. It confirms the plate can carry the loads ASSUMED to be on it; it cannot confirm those loads are realistic. Method B (elastic) is the truer indicator of whether the rigid assumption holds.</li>
-          <li><strong>T_u quality matters more than method choice.</strong> If your T_u is from a rigid-plate analysis but the plate isn't rigid, both checks may pass when the actual demand is much higher. For confirmation, run Profis CBFEM ("Anchor plate design" mode) and compare CBFEM T_u against the rigid-plate T_u — if they differ by more than ~10–15%, the rigid assumption is suspect.</li>
-          <li><strong>If the verdict is NOT RIGID,</strong> the anchor reactions from a rigid-plate ACI 318 hand calc (or Profis "Anchor Design") will UNDERPREDICT the actual demand. Use CBFEM, thicken the plate, or add stiffeners until the verdict becomes RIGID.</li>
-        </ul>
-      </div>
+      {/* 2. Right Main Panel */}
+      <main className="app-main-content">
+        {/* TOP 3-COLUMN CONTROL PANEL GRID */}
+        <div className="top-controls-grid">
+          {/* Column 1: Interactive SVG Diagram */}
+          <RigiditySvgDiagram tp={tp} Nplate={Nplate} column={column} x={x} Tu={Tu} />
+
+          {/* Column 2: Applied Loads & Anchor Tension Override */}
+          <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <div className="card-section-label">Applied Loads &amp; Demand</div>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px" }}>
+              <Field label="Moment, Mu">
+                <input
+                  type="number"
+                  value={Mu_ftkip}
+                  onChange={(e) => setMu_ftkip(+e.target.value)}
+                  className="form-input compact"
+                  step="1"
+                  style={{ padding: "4px 6px" }}
+                />
+              </Field>
+              <Field label="Axial load, Pu">
+                <input
+                  type="number"
+                  value={Pu}
+                  onChange={(e) => setPu(+e.target.value)}
+                  className="form-input compact"
+                  step="0.5"
+                  style={{ padding: "4px 6px" }}
+                />
+              </Field>
+              <Field label="Shear, Vu">
+                <input
+                  type="number"
+                  value={Vu}
+                  onChange={(e) => setVu(+e.target.value)}
+                  className="form-input compact"
+                  step="1"
+                  style={{ padding: "4px 6px" }}
+                />
+              </Field>
+            </div>
+
+            <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: "4px", marginTop: "2px" }}>
+              <div className="toggle-btn-grid" style={{ gridTemplateColumns: "1fr 1.1fr", gap: "4px" }}>
+                <button
+                  onClick={() => setTuMode("auto")}
+                  className={`toggle-option-btn compact ${tuMode === "auto" ? "active" : ""}`}
+                  type="button"
+                  style={{ padding: "4px", fontSize: "10px" }}
+                >
+                  <div className="btn-main-label" style={{ fontSize: "10px", fontWeight: "700" }}>Auto Demand</div>
+                </button>
+                <button
+                  onClick={() => setTuMode("manual")}
+                  className={`toggle-option-btn compact ${tuMode === "manual" ? "active" : ""}`}
+                  type="button"
+                  style={{ padding: "4px", fontSize: "10px" }}
+                >
+                  <div className="btn-main-label" style={{ fontSize: "10px", fontWeight: "700" }}>Manual Override</div>
+                </button>
+              </div>
+
+              {tuMode === "manual" ? (
+                <div style={{ marginTop: "6px" }}>
+                  <Field label="Tension Force, Tu (kips)">
+                    <input
+                      type="number"
+                      value={tuManual}
+                      onChange={(e) => setTuManual(+e.target.value)}
+                      className="form-input compact"
+                      step="0.5"
+                      style={{ padding: "4px 6px" }}
+                    />
+                  </Field>
+                </div>
+              ) : (
+                <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px", lineHeight: "1.3" }}>
+                  Rigid-plate d_lever = <strong>{(tAuto ? tAuto.dLever : 0).toFixed(2)} in</strong><br />
+                  Estimated Tu = <strong>{Tu.toFixed(2)} kip</strong>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Column 3: Anchor Row & Cantilever Geometry */}
+          <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <div className="card-section-label">Cantilever &amp; Bending Width</div>
+            
+            <div className="sidebar-two-col-grid">
+              <InchInput
+                label="Anchor offset, y"
+                value={anchorOffsetY}
+                onChange={setAnchorOffsetY}
+                min={0.25}
+                step={0.25}
+                id="anchor-y"
+              />
+              <Field label="Cantilever, x">
+                <input value={`${x.toFixed(2)} in`} disabled className="form-input compact disabled" style={{ padding: "4px 6px" }} />
+              </Field>
+            </div>
+
+            <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: "6px", marginTop: "2px", display: "flex", flexDirection: "column", gap: "4px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px" }}>
+                <span>Bending width, beff:</span>
+                <strong>{beffUsed.toFixed(1)} in</strong>
+              </div>
+
+              <div className="beff-input-row compact">
+                <input
+                  type="number"
+                  value={beffAuto ? Bplate : beff}
+                  disabled={beffAuto}
+                  onChange={(e) => setBeff(+e.target.value)}
+                  className={`form-input compact ${beffAuto ? "disabled" : ""}`}
+                  step="0.5"
+                />
+                <button onClick={() => setBeffAuto(!beffAuto)} className="btn-auto-manual" type="button">
+                  {beffAuto ? "Auto" : "Manual"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Applied Moment / Eccentricity Context Card (Compact) */}
+        <div className="length-mode-description" style={{ padding: "8px 12px", fontSize: "12px", margin: "0" }}>
+          Mu = {Mu_ftkip} ft·kip = <strong>{Mu.toFixed(0)} kip·in</strong>. Eccentricity e = M/P ={" "}
+          {Pu > 0.001 ? (Mu / Pu).toFixed(1) : "→ ∞"} in. Kern limit N/6 = {(Nplate / 6).toFixed(2)} in.
+        </div>
+
+        {tAutoError && <div className="error-alert"><strong>Tension error:</strong> {tAutoError}</div>}
+        {errors.length > 0 && errors.map((e, i) => <div key={i} className="error-alert">{e}</div>)}
+
+        {/* Check 1: Method B (elastic plate bending) (Collapsible) */}
+        {mB && (
+          <CheckBlock
+            title="Check 1 — Method B: Elastic Plate Bending"
+            codeRef="σmax = 6·Tu·x / (beff·t²) ≤ Fy"
+            traceSteps={mB.trivial ? [
+              { eq: "T_u = 0 → no tension demand",
+                codeRef: "Skipped — no anchor tension",
+                value: "trivially OK" },
+            ] : [
+              { eq: `σ_max = 6 · T_u · x / (b_eff · t_p²)`,
+                codeRef: "Elastic bending stress at column face boundary",
+                value: `${mB.sigmaMax.toFixed(2)} ksi` },
+              { eq: `     = 6 · ${Tu.toFixed(2)} · ${x.toFixed(2)} / (${beffUsed} · ${tp}²)`,
+                codeRef: "Substituted metrics",
+                value: `${mB.sigmaMax.toFixed(2)} ksi` },
+              { eq: `vs F_yp = ${plateGrade.fy} ksi`,
+                codeRef: "Plate material yield strength",
+                value: `DCR = ${mB.DCR.toFixed(3)}` },
+              { eq: `t_req (elastic) = √(6·Tu·x / (beff·Fy))`,
+                codeRef: "Solving stress equation for thickness",
+                value: `${mB.tReq.toFixed(3)} in` },
+            ]}
+            statCards={[
+              { label: "σ_max", value: mB.trivial ? "—" : `${mB.sigmaMax.toFixed(1)} ksi` },
+              { label: "F_yp", value: `${plateGrade.fy} ksi` },
+              { label: "DCR (σ/Fy)", value: mB.trivial ? "—" : mB.DCR.toFixed(3) },
+            ]}
+            checkProps={{
+              status: mB.pass ? "OK" : "NG",
+              demand: mB.sigmaMax,
+              cap: plateGrade.fy,
+              dcr: mB.DCR,
+              label: mB.pass
+                ? "Plate stays elastic under Tu — supports rigid-plate kinematic assumption"
+                : "Plate yields locally under Tu — rigid-plate assumption violated",
+            }}
+          />
+        )}
+
+        {/* Check 2: DG1 §3.4 (Collapsible) */}
+        {dg1 && (
+          <CheckBlock
+            title="Check 2 — AISC DG1 §3.4 Plastic Cantilever"
+            codeRef="AISC Eq. 3.4.7 form: t ≥ √(4·Tu·x / (φ·Fy·beff))"
+            traceSteps={dg1.trivial ? [
+              { eq: "T_u = 0 → no tension demand",
+                codeRef: "Skipped — no anchor tension",
+                value: "trivially OK" },
+            ] : [
+              { eq: `t_req = √(4 · T_u · x / (φ · F_yp · b_eff))`,
+                codeRef: "DG1 §3.4 plastic moment unit width, φ=0.9",
+                value: `${dg1.tReq.toFixed(3)} in` },
+              { eq: `     = √(4 · ${Tu.toFixed(2)} · ${x.toFixed(2)} / (0.9 · ${plateGrade.fy} · ${beffUsed}))`,
+                codeRef: "Substituted design metrics",
+                value: `${dg1.tReq.toFixed(3)} in` },
+              { eq: `t_provided = ${tp} in`,
+                codeRef: "Provided plate thickness",
+                value: `${tp} in` },
+            ]}
+            statCards={[
+              { label: "t_req (DG1)", value: dg1.trivial ? "—" : `${dg1.tReq.toFixed(3)} in` },
+              { label: "t_provided", value: `${tp} in` },
+              { label: "DCR", value: dg1.trivial ? "—" : dg1.DCR.toFixed(3) },
+            ]}
+            checkProps={{
+              status: dg1.pass ? "OK" : "NG",
+              demand: dg1.tReq,
+              cap: tp,
+              dcr: dg1.DCR,
+              label: dg1.pass
+                ? "Plate adequate per DG1 §3.4 limits"
+                : "Plate fails DG1 §3.4 — base plate yields plastically, not rigid",
+            }}
+          />
+        )}
+
+        {/* Rigidity Verdict Panel */}
+        {verdict && (
+          <div className={`verdict-summary-card ${verdict.color === "ok" ? "pass" : "fail"}`} style={{ marginTop: "12px", padding: "10px 14px" }}>
+            <div className="verdict-title" style={{ fontSize: "14px" }}>
+              Rigidity verdict: <strong style={{ color: verdict.color === "ok" ? "var(--success)" : "var(--danger)" }}>{verdict.verdict}</strong>
+              <span className="verdict-details" style={{ fontSize: "11px", marginLeft: "10px", color: "var(--text-muted)" }}>
+                Method B {mB.pass ? "✓" : "✗"}  ·  DG1 {dg1.pass ? "✓" : "✗"}
+              </span>
+            </div>
+            <div className="verdict-note" style={{ fontSize: "11px", marginTop: "4px", lineHeight: "1.4" }}>{verdict.note}</div>
+          </div>
+        )}
+
+        {/* Engineering Footnote Card (Collapsible) */}
+        <div className="card compact shadow-sm border-0" style={{ padding: "10px 12px" }}>
+          <div className="card-section-label" style={{ fontSize: "10px", marginBottom: "6px" }}>Notes on rigidity checks</div>
+          <ul className="notes-list" style={{ fontSize: "11px", gap: "3px" }}>
+            <li>Method B asks for ~16% more thickness than plastic DG1 design limits.</li>
+            <li>If Method B yields, rigid reactions under hand calculations are unconservative — use stiffeners or thicker base plate.</li>
+          </ul>
+        </div>
+      </main>
     </div>
   );
 }

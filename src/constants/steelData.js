@@ -15,12 +15,18 @@ export const LEG_SIZES = [
 export const FEXX_OPTIONS = [60, 70, 80, 90, 100, 110];
 
 export const STEEL_GRADES = [
-  { label: "A36 — Plate (Fy = 36, Fu = 58 ksi)",              category: "plate", fy: 36, fu: 58 },
-  { label: "A572 Gr 50 — Plate (Fy = 50, Fu = 65 ksi)",       category: "plate", fy: 50, fu: 65 },
-  { label: "A992 — W-shapes (Fy = 50, Fu = 65 ksi)",          category: "wshape", fy: 50, fu: 65 },
-  { label: "A500 Gr B — Rect HSS (Fy = 46, Fu = 58)",         category: "hss",   fy: 46, fu: 58 },
-  { label: "A500 Gr C — Rect HSS (Fy = 50, Fu = 62)",         category: "hss",   fy: 50, fu: 62 },
-  { label: "A1085 — Rect HSS (Fy = 50, Fu = 65 ksi)",         category: "hss",   fy: 50, fu: 65 },
+  // Plate grades (indices 0–1)
+  { label: "A36 — Plate (Fy = 36, Fu = 58 ksi)",              shortLabel: "A36",              category: "plate",  fy: 36, fu: 58 },
+  { label: "A572 Gr 50 — Plate (Fy = 50, Fu = 65 ksi)",       shortLabel: "A572 Gr 50",       category: "plate",  fy: 50, fu: 65 },
+  // W-shape grades (index 2)
+  { label: "A992 — W-shapes (Fy = 50, Fu = 65 ksi)",          shortLabel: "A992 (50/65)",     category: "wshape", fy: 50, fu: 65 },
+  // HSS grades (indices 3–8)
+  { label: "A36 — HSS (Fy = 36, Fu = 58 ksi)",                shortLabel: "A36 (36/58)",      category: "hss",    fy: 36, fu: 58 },
+  { label: "A53 Gr B — HSS Pipe (Fy = 35, Fu = 60 ksi)",      shortLabel: "A53 Gr B (35/60)", category: "hss",    fy: 35, fu: 60 },
+  { label: "A500 Gr B — Rect HSS (Fy = 46, Fu = 58 ksi)",     shortLabel: "A500 Gr B (46/58)",category: "hss",    fy: 46, fu: 58 },
+  { label: "A500 Gr C — Rect HSS (Fy = 50, Fu = 62 ksi)",     shortLabel: "A500 Gr C (50/62)",category: "hss",    fy: 50, fu: 62 },
+  { label: "A847 — Weathering HSS (Fy = 50, Fu = 70 ksi)",    shortLabel: "A847 (50/70)",     category: "hss",    fy: 50, fu: 70 },
+  { label: "A1085 — Rect HSS (Fy = 50, Fu = 65 ksi)",         shortLabel: "A1085 (50/65)",    category: "hss",    fy: 50, fu: 65 },
 ];
 
 export const HSS_SHAPES = [

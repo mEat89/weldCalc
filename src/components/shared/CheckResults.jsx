@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 /**
  * Renders a single math equation trace line with its corresponding code reference
@@ -54,33 +54,63 @@ export function CheckBox({ status, demand, cap, dcr, label }) {
  * Renders a full validation card grouping math trace steps, metrics, and checking status
  */
 export function CheckBlock({ title, codeRef, traceSteps, statCards, checkProps }) {
+  const [isOpen, setIsOpen] = useState(true);
   return (
     <div className="card check-block-card">
-      <div className="check-block-header">
-        <span className="header-title">{title}</span>
-        <span className="header-ref">{codeRef}</span>
-      </div>
-      <div className="check-block-content">
-        <div className="trace-steps-container">
-          {traceSteps.map((step, i) => (
-            <TraceStep
-              key={i}
-              eq={step.eq}
-              codeRef={step.codeRef}
-              value={step.value}
-              last={i === traceSteps.length - 1}
-            />
-          ))}
+      <div
+        className="check-block-header collapsible"
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ cursor: "pointer" }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setIsOpen(!isOpen); e.preventDefault(); } }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+          <span className="header-title">{title}</span>
+          <span className="header-ref">{codeRef}</span>
         </div>
-        <div className="metrics-and-status-container">
-          <div className="stat-cards-vertical">
-            {statCards.map((s, i) => (
-              <StatCard key={i} label={s.label} value={s.value} />
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {checkProps && checkProps.status && (
+            <span className={`status-badge-mini ${checkProps.status === "OK" ? "pass" : "fail"}`}>
+              {checkProps.status}
+            </span>
+          )}
+          <span
+            style={{
+              display: "inline-block",
+              transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
+              transition: "transform 0.2s",
+              fontSize: "10px",
+              color: "var(--text-muted)",
+            }}
+          >
+            ▶
+          </span>
+        </div>
+      </div>
+      {isOpen && (
+        <div className="check-block-content" style={{ marginTop: "6px", borderTop: "1px solid var(--border-color)", paddingTop: "6px" }}>
+          <div className="trace-steps-container">
+            {traceSteps.map((step, i) => (
+              <TraceStep
+                key={i}
+                eq={step.eq}
+                codeRef={step.codeRef}
+                value={step.value}
+                last={i === traceSteps.length - 1}
+              />
             ))}
           </div>
-          {checkProps && checkProps.status && <CheckBox {...checkProps} />}
+          <div className="metrics-and-status-container">
+            <div className="stat-cards-vertical">
+              {statCards.map((s, i) => (
+                <StatCard key={i} label={s.label} value={s.value} />
+              ))}
+            </div>
+            {checkProps && checkProps.status && <CheckBox {...checkProps} />}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
