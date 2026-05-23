@@ -322,8 +322,8 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
               </div>
             )}
             <div style={{ marginTop: "10px", paddingTop: "8px", borderTop: "1px dashed var(--border-color)" }}>
-              <label htmlFor="demand-input" style={{ fontSize: "12px", fontWeight: "700", color: "var(--primary-dark)", display: "block", marginBottom: "4px" }}>
-                Acting Axial Force, P (kips)
+              <label htmlFor="demand-input" style={{ fontSize: "11px", fontWeight: "700", color: "var(--primary-dark)", display: "block", marginBottom: "4px", whiteSpace: "nowrap" }}>
+                Acting Axial Load, P (Ultimate) (kips)
               </label>
               <input
                 id="demand-input"
