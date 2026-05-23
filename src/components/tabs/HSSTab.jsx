@@ -18,7 +18,7 @@ import {
   toFraction,
   to16ths,
 } from "../../math/weldMath";
-import { Field, PlateThicknessSelect } from "../shared/FormElements";
+import { Field, PlateThicknessSelect, HssMemberSelect, SteelGradeSelect } from "../shared/FormElements";
 import { CheckBlock, WarningBanner } from "../shared/CheckResults";
 import HssSvgDiagram from "../shared/HssSvgDiagram";
 import ReportActions from "../shared/ReportActions";
@@ -261,9 +261,9 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
       {/* 1. Left Sidebar menu Panel (Extremely Compact) */}
       <aside className="app-sidebar compact">
         <div className="app-sidebar-header">
-          <h1>
-            Weld Capacity
-            <span className="version-badge">v2.5</span>
+          <h1 style={{ fontSize: "13.5px", letterSpacing: "-0.01em", display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+            <span>WeldCapacity &amp; Plate Rigidity Check</span>
+            <span className="version-badge" style={{ fontSize: "9px", padding: "1px 5px" }}>v2.5</span>
           </h1>
           <div className="header-subtitle">
             AISC 360-22 / 360-16 + DG1 — Rect HSS welds
@@ -331,8 +331,9 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
               onClick={() => setActiveTab(t.id)}
               className={`tab-nav-btn-horizontal ${activeTab === t.id ? "active" : ""}`}
               type="button"
+              style={{ height: "42px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", lineHeight: "1.2", whiteSpace: "normal", padding: "2px 4px", fontSize: "10px" }}
             >
-              {t.id === "hss" ? "HSS" : t.id === "standard" ? "Standard" : "Rigidity"}
+              {t.id === "hss" ? "HSS Weld" : t.id === "standard" ? "Standard Shape Weld" : "Plate Rigidity"}
             </button>
           ))}
         </nav>
@@ -367,83 +368,50 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
           </div>
           
           <div className="sidebar-two-col-grid">
-            <Field label={connType === "hss2plate" ? "HSS member" : "Branch HSS"} id="hss-member-select">
-              <select
-                id="hss-member-select"
-                value={branchIdx}
-                onChange={(e) => setBranchIdx(parseInt(e.target.value))}
-                className="form-select compact"
-              >
-                {HSS_SHAPES.map((s, i) => (
-                  <option key={i} value={i}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label={connType === "hss2plate" ? "HSS grade" : "Branch grade"} id="branch-grade-select">
-              <select
-                id="branch-grade-select"
-                value={branchGradeIdx}
-                onChange={(e) => setBranchGradeIdx(parseInt(e.target.value))}
-                className="form-select compact"
-              >
-                {STEEL_GRADES.filter((g) => g.category === "hss").map((g) => {
-                  const idx = STEEL_GRADES.indexOf(g);
-                  return <option key={idx} value={idx}>{g.shortLabel}</option>;
-                })}
-              </select>
-            </Field>
+            <HssMemberSelect
+              label={connType === "hss2plate" ? "HSS member" : "Branch HSS"}
+              value={branchIdx}
+              onChange={setBranchIdx}
+              id="hss-member-select"
+            />
+            <SteelGradeSelect
+              label={connType === "hss2plate" ? "HSS grade" : "Branch grade"}
+              value={branchGradeIdx}
+              onChange={setBranchGradeIdx}
+              id="branch-grade-select"
+              category="hss"
+            />
           </div>
 
           {connType === "hss2plate" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
               <div className="sidebar-two-col-grid">
-                <Field label="Plate grade" id="plate-grade-select">
-                  <select
-                    id="plate-grade-select"
-                    value={plateGradeIdx}
-                    onChange={(e) => setPlateGradeIdx(parseInt(e.target.value))}
-                    className="form-select compact"
-                  >
-                    {STEEL_GRADES.filter((g) => g.category === "plate").map((g) => {
-                      const idx = STEEL_GRADES.indexOf(g);
-                      return <option key={idx} value={idx}>{g.shortLabel}</option>;
-                    })}
-                  </select>
-                </Field>
+                <SteelGradeSelect
+                  label="Plate grade"
+                  value={plateGradeIdx}
+                  onChange={setPlateGradeIdx}
+                  id="plate-grade-select"
+                  category="plate"
+                />
                 <PlateThicknessSelect label="Plate tp" value={plateT} onChange={setPlateT} id="plate-thickness-select" />
               </div>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
               <div className="sidebar-two-col-grid">
-                <Field label="Chord HSS" id="chord-hss-select">
-                  <select
-                    id="chord-hss-select"
-                    value={chordIdx}
-                    onChange={(e) => setChordIdx(parseInt(e.target.value))}
-                    className="form-select compact"
-                  >
-                    {HSS_SHAPES.map((s, i) => (
-                      <option key={i} value={i}>{s.name}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Chord grade" id="chord-grade-select">
-                  <select
-                    id="chord-grade-select"
-                    value={chordGradeIdx}
-                    onChange={(e) => setChordGradeIdx(parseInt(e.target.value))}
-                    className="form-select compact"
-                  >
-                    {STEEL_GRADES.filter((g) => g.category === "hss").map((g) => {
-                      const idx = STEEL_GRADES.indexOf(g);
-                      return <option key={idx} value={idx}>{g.shortLabel}</option>;
-                    })}
-                  </select>
-                </Field>
+                <HssMemberSelect
+                  label="Chord HSS"
+                  value={chordIdx}
+                  onChange={setChordIdx}
+                  id="chord-hss-select"
+                />
+                <SteelGradeSelect
+                  label="Chord grade"
+                  value={chordGradeIdx}
+                  onChange={setChordGradeIdx}
+                  id="chord-grade-select"
+                  category="hss"
+                />
               </div>
               <div className="sidebar-two-col-grid">
                 <Field label="Chord t_des">

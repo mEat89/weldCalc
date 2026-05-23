@@ -1,6 +1,6 @@
 import React from "react";
 import { toFraction, to16ths } from "../../math/weldMath";
-import { COMMON_PLATE_T, LOAD_CASES } from "../../constants/steelData";
+import { COMMON_PLATE_T, LOAD_CASES, HSS_SHAPES, STEEL_GRADES } from "../../constants/steelData";
 
 /**
  * Standard wrapper for labels, inputs, and descriptions
@@ -152,5 +152,56 @@ export function LoadCaseSelector({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Reusable selection dropdown for the entire HSS shapes catalog
+ */
+export function HssMemberSelect({ label, value, onChange, id }) {
+  return (
+    <Field label={label} id={id}>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(parseInt(e.target.value, 10))}
+        className="form-select compact"
+      >
+        {HSS_SHAPES.map((s, i) => (
+          <option key={i} value={i}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+}
+
+/**
+ * Reusable selection dropdown for steel grades (filtered by category like "hss" or "plate")
+ */
+export function SteelGradeSelect({ label, value, onChange, id, category }) {
+  const grades = category
+    ? STEEL_GRADES.filter((g) => g.category === category)
+    : STEEL_GRADES;
+
+  return (
+    <Field label={label} id={id}>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(parseInt(e.target.value, 10))}
+        className="form-select compact"
+      >
+        {grades.map((g) => {
+          const idx = STEEL_GRADES.indexOf(g);
+          return (
+            <option key={idx} value={idx}>
+              {g.shortLabel}
+            </option>
+          );
+        })}
+      </select>
+    </Field>
   );
 }

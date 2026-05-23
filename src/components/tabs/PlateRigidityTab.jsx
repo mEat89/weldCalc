@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import { HSS_SHAPES, STEEL_GRADES } from "../../constants/steelData";
 import { toFraction } from "../../math/weldMath";
 import { calcAnchorTensionAuto, calcMethodB, calcDG1, calcRigidityVerdict } from "../../math/plateMath";
-import { Field, InchInput, PlateThicknessSelect } from "../shared/FormElements";
+import { Field, InchInput, PlateThicknessSelect, HssMemberSelect, SteelGradeSelect } from "../shared/FormElements";
 import { CheckBlock } from "../shared/CheckResults";
 import RigiditySvgDiagram from "../shared/RigiditySvgDiagram";
 import ReportActions from "../shared/ReportActions";
@@ -69,9 +69,9 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
       {/* 1. Left Sidebar Inputs (Compact) */}
       <aside className="app-sidebar compact">
         <div className="app-sidebar-header">
-          <h1>
-            Weld Capacity
-            <span className="version-badge">v2.5</span>
+          <h1 style={{ fontSize: "13.5px", letterSpacing: "-0.01em", display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+            <span>WeldCapacity &amp; Plate Rigidity Check</span>
+            <span className="version-badge" style={{ fontSize: "9px", padding: "1px 5px" }}>v2.5</span>
           </h1>
           <div className="header-subtitle">
             AISC DG1 — Base plate rigidity check
@@ -131,8 +131,9 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
               onClick={() => setActiveTab(t.id)}
               className={`tab-nav-btn-horizontal ${activeTab === t.id ? "active" : ""}`}
               type="button"
+              style={{ height: "42px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", lineHeight: "1.2", whiteSpace: "normal", padding: "2px 4px", fontSize: "10px" }}
             >
-              {t.id === "hss" ? "HSS" : t.id === "standard" ? "Standard" : "Rigidity"}
+              {t.id === "hss" ? "HSS Weld" : t.id === "standard" ? "Standard Shape Weld" : "Plate Rigidity"}
             </button>
           ))}
         </nav>
@@ -142,18 +143,12 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
           <div className="card-section-label">Column (HSS)</div>
           
           <div className="sidebar-two-col-grid">
-            <Field label="Shape" id="column-shape">
-              <select
-                id="column-shape"
-                value={columnIdx}
-                onChange={(e) => setColumnIdx(+e.target.value)}
-                className="form-select compact"
-              >
-                {HSS_SHAPES.map((s, i) => (
-                  <option key={i} value={i}>{s.name}</option>
-                ))}
-              </select>
-            </Field>
+            <HssMemberSelect
+              label="Shape"
+              value={columnIdx}
+              onChange={setColumnIdx}
+              id="column-shape"
+            />
 
             <Field label="Orientation" id="column-orientation">
               <select
@@ -188,19 +183,13 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
 
           <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
             <div className="sidebar-two-col-grid">
-              <Field label="Plate material" id="plate-material">
-                <select
-                  id="plate-material"
-                  value={plateGradeIdx}
-                  onChange={(e) => setPlateGradeIdx(+e.target.value)}
-                  className="form-select compact"
-                >
-                  {STEEL_GRADES.filter((g) => g.category === "plate").map((g) => {
-                    const idx = STEEL_GRADES.indexOf(g);
-                    return <option key={idx} value={idx}>{g.shortLabel}</option>;
-                  })}
-                </select>
-              </Field>
+              <SteelGradeSelect
+                label="Plate material"
+                value={plateGradeIdx}
+                onChange={setPlateGradeIdx}
+                id="plate-material"
+                category="plate"
+              />
               <PlateThicknessSelect label="tp (thickness)" value={tp} onChange={setTp} id="plate-tp-select" />
             </div>
           </div>

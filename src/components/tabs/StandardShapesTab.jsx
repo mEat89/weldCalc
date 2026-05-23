@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import { STEEL_GRADES, LEG_SIZES, FEXX_OPTIONS, SHAPE_PRESETS, LOAD_CASES } from "../../constants/steelData";
 import { calcWeldMetal, calcBaseMetal, calcWeldSize, toFraction, to16ths } from "../../math/weldMath";
-import { Field, PlateThicknessSelect } from "../shared/FormElements";
+import { Field, PlateThicknessSelect, SteelGradeSelect } from "../shared/FormElements";
 import { CheckBlock } from "../shared/CheckResults";
 import ShapesSvgDiagram from "../shared/ShapesSvgDiagram";
 import ReportActions from "../shared/ReportActions";
@@ -67,9 +67,9 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
       {/* 1. Left Sidebar menu Panel (Compact) */}
       <aside className="app-sidebar compact">
         <div className="app-sidebar-header">
-          <h1>
-            Weld Capacity
-            <span className="version-badge">v2.5</span>
+          <h1 style={{ fontSize: "13.5px", letterSpacing: "-0.01em", display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+            <span>WeldCapacity &amp; Plate Rigidity Check</span>
+            <span className="version-badge" style={{ fontSize: "9px", padding: "1px 5px" }}>v2.5</span>
           </h1>
           <div className="header-subtitle">
             AISC 360-16 — Standard shapes weldments
@@ -130,8 +130,9 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
               onClick={() => setActiveTab(t.id)}
               className={`tab-nav-btn-horizontal ${activeTab === t.id ? "active" : ""}`}
               type="button"
+              style={{ height: "42px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", lineHeight: "1.2", whiteSpace: "normal", padding: "2px 4px", fontSize: "10px" }}
             >
-              {t.id === "hss" ? "HSS" : t.id === "standard" ? "Standard" : "Rigidity"}
+              {t.id === "hss" ? "HSS Weld" : t.id === "standard" ? "Standard Shape Weld" : "Plate Rigidity"}
             </button>
           ))}
         </nav>
@@ -164,40 +165,92 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <div className="sidebar-two-col-grid">
               <PlateThicknessSelect label="Member thickness" value={memberT} onChange={setMemberT} id="member-thickness" />
-              <Field label="Member grade" id="member-grade">
-                <select
-                  id="member-grade"
-                  value={memberGradeIdx}
-                  onChange={(e) => setMemberGradeIdx(parseInt(e.target.value))}
-                  className="form-select compact"
-                >
-                  {STEEL_GRADES.map((g, i) => (
-                    <option key={i} value={i}>{g.shortLabel}</option>
-                  ))}
-                </select>
-              </Field>
+              <SteelGradeSelect
+                label="Member grade"
+                value={memberGradeIdx}
+                onChange={setMemberGradeIdx}
+                id="member-grade"
+              />
             </div>
             
             <div className="sidebar-two-col-grid">
               <PlateThicknessSelect label="Plate thickness, tp" value={plateT} onChange={setPlateT} id="plate-thickness" />
-              <Field label="Plate grade" id="plate-grade">
-                <select
-                  id="plate-grade"
-                  value={plateGradeIdx}
-                  onChange={(e) => setPlateGradeIdx(parseInt(e.target.value))}
-                  className="form-select compact"
-                >
-                  {STEEL_GRADES.filter((g) => g.category === "plate").map((g) => {
-                    const idx = STEEL_GRADES.indexOf(g);
-                    return <option key={idx} value={idx}>{g.shortLabel}</option>;
-                  })}
-                </select>
-              </Field>
+              <SteelGradeSelect label="Plate grade" value={plateGradeIdx} onChange={setPlateGradeIdx} id="plate-grade" category="plate" />
             </div>
 
             <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: "6px", fontSize: "11px", color: "var(--text-muted)", lineHeight: "1.4" }}>
               <strong>Governing base metal:</strong> {baseLabel}, t = {toFraction(baseT)}, Fy = {baseFy} ksi
             </div>
+          </div>
+        </div>
+
+        {/* Weld Parameters */}
+        <div className="card compact shadow-sm border-0">
+          <div className="card-section-label">Weld Parameters</div>
+          <div className="sidebar-two-col-grid">
+            <Field label="Leg Size, w" id="weld-leg">
+              <select
+                id="weld-leg"
+                value={legSize}
+                onChange={(e) => setLegSize(parseFloat(e.target.value))}
+                className="form-select compact"
+                style={{ padding: "4px 6px" }}
+              >
+                {LEG_SIZES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </Field>
+
+            <Field label="Electrode" id="electrode-fexx">
+              <select
+                id="electrode-fexx"
+                value={fexx}
+                onChange={(e) => setFexx(parseFloat(e.target.value))}
+                className="form-select compact"
+                style={{ padding: "4px 6px" }}
+              >
+                {FEXX_OPTIONS.map((f) => <option key={f} value={f}>E{f}</option>)}
+              </select>
+            </Field>
+          </div>
+
+          <div className="sidebar-two-col-grid" style={{ marginTop: "8px" }}>
+            <Field label="Length per line">
+              <input
+                type="number"
+                min="0.1"
+                step="0.1"
+                value={length}
+                onChange={(e) => setLength(parseFloat(e.target.value) || 0)}
+                className="form-input compact"
+                style={{ padding: "4px 6px" }}
+              />
+            </Field>
+
+            <Field label="Weld lines, n" id="weld-lines">
+              <select
+                id="weld-lines"
+                value={nLines}
+                onChange={(e) => setNLines(parseInt(e.target.value))}
+                className="form-select compact"
+                style={{ padding: "4px 6px" }}
+              >
+                {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </Field>
+          </div>
+
+          <div style={{ marginTop: "8px", borderTop: "1px solid var(--border-color)", paddingTop: "8px" }}>
+            <Field label="Demand, P (kips)">
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                value={appliedLoad}
+                onChange={(e) => setAppliedLoad(parseFloat(e.target.value) || 0)}
+                className="form-input compact"
+                style={{ padding: "4px 6px" }}
+              />
+            </Field>
           </div>
         </div>
       </aside>
@@ -282,74 +335,40 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
             )}
           </div>
 
-          {/* Column 3: Weld Parameters (Compacted) */}
+          {/* Column 3: AISC 360-16 Weld Reference Guide */}
           <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            <div className="card-section-label">Weld Parameters</div>
+            <div className="card-section-label">Weld Design Guide (§J2.4)</div>
             
-            <div className="sidebar-two-col-grid">
-              <Field label="Leg Size, w" id="weld-leg">
-                <select
-                  id="weld-leg"
-                  value={legSize}
-                  onChange={(e) => setLegSize(parseFloat(e.target.value))}
-                  className="form-select compact"
-                  style={{ padding: "4px 6px" }}
-                >
-                  {LEG_SIZES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </select>
-              </Field>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "11.5px", lineHeight: "1.4" }}>
+              <div style={{ padding: "6px 8px", backgroundColor: "var(--surface-subtle)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
+                <strong>Nominal Weld Stress (Fnw)</strong>
+                <div style={{ fontFamily: "monospace", fontSize: "11px", marginTop: "3px", color: "var(--primary)" }}>
+                  Fnw = 0.60·FEXX·(1 + 0.5·sin^1.5 θ)
+                </div>
+                <div style={{ fontSize: "10.5px", color: "var(--text-muted)", marginTop: "2px" }}>
+                  Directional increase available for θ &gt; 0° (Eq. J2-5)
+                </div>
+              </div>
 
-              <Field label="Electrode" id="electrode-fexx">
-                <select
-                  id="electrode-fexx"
-                  value={fexx}
-                  onChange={(e) => setFexx(parseFloat(e.target.value))}
-                  className="form-select compact"
-                  style={{ padding: "4px 6px" }}
-                >
-                  {FEXX_OPTIONS.map((f) => <option key={f} value={f}>E{f}</option>)}
-                </select>
-              </Field>
-            </div>
+              <div style={{ padding: "6px 8px", backgroundColor: "var(--surface-subtle)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
+                <strong>Effective Throat (te)</strong>
+                <div style={{ fontFamily: "monospace", fontSize: "11px", marginTop: "3px", color: "var(--primary)" }}>
+                  te = 0.707·w
+                </div>
+                <div style={{ fontSize: "10.5px", color: "var(--text-muted)", marginTop: "2px" }}>
+                  For fillet welds with nominal leg size (w)
+                </div>
+              </div>
 
-            <div className="sidebar-two-col-grid" style={{ marginTop: "2px" }}>
-              <Field label="Length per line">
-                <input
-                  type="number"
-                  min="0.1"
-                  step="0.1"
-                  value={length}
-                  onChange={(e) => setLength(parseFloat(e.target.value) || 0)}
-                  className="form-input compact"
-                  style={{ padding: "4px 6px" }}
-                />
-              </Field>
-
-              <Field label="Weld lines, n" id="weld-lines">
-                <select
-                  id="weld-lines"
-                  value={nLines}
-                  onChange={(e) => setNLines(parseInt(e.target.value))}
-                  className="form-select compact"
-                  style={{ padding: "4px 6px" }}
-                >
-                  {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
-              </Field>
-            </div>
-
-            <div style={{ marginTop: "2px", borderTop: "1px solid var(--border-color)", paddingTop: "4px" }}>
-              <Field label="Demand, P (kips)">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={appliedLoad}
-                  onChange={(e) => setAppliedLoad(parseFloat(e.target.value) || 0)}
-                  className="form-input compact"
-                  style={{ padding: "4px 6px" }}
-                />
-              </Field>
+              <div style={{ padding: "6px 8px", backgroundColor: "var(--surface-subtle)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
+                <strong>Design Strength (φRn)</strong>
+                <div style={{ fontFamily: "monospace", fontSize: "11px", marginTop: "3px", color: "var(--primary)" }}>
+                  φRn = φ·Fnw·Awe
+                </div>
+                <div style={{ fontSize: "10.5px", color: "var(--text-muted)", marginTop: "2px" }}>
+                  LRFD Resistance Factor: φ = 0.75 (§J2.4a)
+                </div>
+              </div>
             </div>
           </div>
         </div>
