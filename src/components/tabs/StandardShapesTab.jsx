@@ -348,7 +348,12 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
               { eq: `Awe = te·L·n = ${weld.te.toFixed(4)}·${length}·${nLines}`,
                 codeRef: "AISC 360-16 §J2.4(a) weld total area", value: `${weld.Awe.toFixed(3)} in²` },
               { eq: fnwEq, codeRef: fnwRef, value: `${weld.Fnw.toFixed(2)} ksi` },
-              { eq: "Rn = Fnw·Awe", codeRef: "AISC 360-16 §J2.4 nominal strength", value: `${weld.Rn.toFixed(2)} kips` },
+              ...(weld.beta < 1.0 ? [
+                { eq: "β = 1.2 - 0.002·(L/w)", codeRef: `AISC §J2.2b Eq. J2-1 long weld reduction (L/w = ${(length / legSize).toFixed(1)} > 100)`, value: weld.beta.toFixed(3) },
+                { eq: "Rn = β·Fnw·Awe", codeRef: "AISC 360-16 §J2.4 nominal strength (reduced)", value: `${weld.Rn.toFixed(2)} kips` }
+              ] : [
+                { eq: "Rn = Fnw·Awe", codeRef: "AISC 360-16 §J2.4 nominal strength", value: `${weld.Rn.toFixed(2)} kips` }
+              ]),
               { eq: designEq, codeRef: designRef, value: `${weld.cap.toFixed(2)} kips` },
             ]}
             statCards={[

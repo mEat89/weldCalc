@@ -46,7 +46,10 @@ export default function ReferencesModal({ onClose }) {
                   The governing capacity is taken as the minimum of the weld metal rupture and the thinner base metal limit state, protecting against premature base metal tearing.
                 </li>
                 <li>
-                  <strong>Weld Size Compatibility (§J2.2b):</strong> Deposits must satisfy minimum sizing (Table J2.4) to avoid rapid quenching, and maximum sizing (§J2.2b) to prevent burning away the edges of the thinner connected parts (t - 1/16" for parts &ge; 1/4").
+                  <strong>Weld Sizing Rules (§J2.2b):</strong> Deposits must satisfy minimum sizing (Table J2.4) to avoid rapid quenching, and maximum sizing (§J2.2b) to prevent burning away the edges of the thinner connected parts (t - 1/16" for parts &ge; 1/4").
+                </li>
+                <li>
+                  <strong>Longitudinal Weld Length Reduction factor β (§J2.2b / Eq. J2-1):</strong> Under longitudinal shear, very long welds experience non-uniform stress (concentrated at loaded ends). For L/w &gt; 100, the nominal strength is multiplied by β = 1.2 - 0.002·(L/w) ≤ 1.0, and capped at a maximum reduction of 0.60 for L/w &gt; 300. Our calculator now strictly applies this reduction to both standard and HSS tabs to guarantee compliance.
                 </li>
               </ul>
             </div>
@@ -65,6 +68,7 @@ export default function ReferencesModal({ onClose }) {
                 <ul className="refs-list mt-1" style={{ paddingLeft: "16px", fontSize: "13px", display: "flex", flexDirection: "column", gap: "4px" }}>
                   <li>§J2.2a — Fillet weld effective throat (te = 0.707 · w).</li>
                   <li>§J2.2b &amp; Table J2.4 — Minimum and maximum fillet weld leg sizes based on thinner joined part thickness.</li>
+                  <li>§J2.2b &amp; Eq. J2-1 — Longitudinal fillet weld length reduction factor β = 1.2 - 0.002·(L/w) &le; 1.0 (when ratio exceeds 100). Capped at 0.60 for ratio &gt; 300.</li>
                   <li>§J2.4 &amp; Eq. J2-5 — Fillet weld metal shear strength; LRFD φ = 0.75. Directional factor k_ds locked to 1.0 for HSS connections per commentary.</li>
                   <li>§J4.2 &amp; Eqs. J4-3 / J4-4 — Base metal shear yielding (φ = 1.00) and base metal shear rupture (φ = 0.75) limits.</li>
                   <li>§K1.2.2a &amp; Eq. K1-1 — Hollow Structural Section connection uneven stress effective width B_e calculation for transverse walls.</li>

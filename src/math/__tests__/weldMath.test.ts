@@ -85,6 +85,36 @@ describe("weldMath Unit Tests", () => {
       expect(result.Fnw).toBeCloseTo(0.6 * 70 * 1.5, 4);
     });
 
+    it("applies the beta reduction factor for long welds where L/w > 100", () => {
+      // Weld size = 1/4", Length = 30", L/w = 120 > 100
+      const result = calcWeldMetal({
+        legSize: 0.25,
+        length: 30,
+        fexx: 70,
+        thetaDeg: 0,
+        nLines: 1,
+        method: "lrfd",
+        useDirectional: false,
+        appliedLoad: 10,
+      });
+
+      const expectedBeta = 1.2 - 0.002 * 120; // 0.96
+      expect(result.beta).toBeCloseTo(expectedBeta, 4);
+
+      // Weld size = 1/4", Length = 80", L/w = 320 > 300
+      const resultCapped = calcWeldMetal({
+        legSize: 0.25,
+        length: 80,
+        fexx: 70,
+        thetaDeg: 0,
+        nLines: 1,
+        method: "lrfd",
+        useDirectional: false,
+        appliedLoad: 10,
+      });
+      expect(resultCapped.beta).toBe(0.60);
+    });
+
     it("throws error on invalid inputs", () => {
       expect(() => {
         calcWeldMetal({

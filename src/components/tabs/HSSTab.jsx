@@ -754,7 +754,12 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
               { eq: `Awe = te·L_eff = ${weld.te.toFixed(4)}·${faceLen.length.toFixed(3)}`,
                 codeRef: "AISC 360-16 §J2.4 effective area", value: `${weld.Awe.toFixed(3)} in²` },
               { eq: fnwEq, codeRef: fnwRef, value: `${weld.Fnw.toFixed(2)} ksi` },
-              { eq: "Rn = Fnw·Awe", codeRef: "AISC 360-16 §J2.4 nominal capacity", value: `${weld.Rn.toFixed(2)} kips` },
+              ...(weld.beta < 1.0 ? [
+                { eq: "β = 1.2 - 0.002·(L/w)", codeRef: `AISC §J2.2b Eq. J2-1 long weld reduction (L/w = ${(faceLen.length / legSize).toFixed(1)} > 100)`, value: weld.beta.toFixed(3) },
+                { eq: "Rn = β·Fnw·Awe", codeRef: "AISC 360-16 §J2.4 nominal capacity (reduced)", value: `${weld.Rn.toFixed(2)} kips` }
+              ] : [
+                { eq: "Rn = Fnw·Awe", codeRef: "AISC 360-16 §J2.4 nominal capacity", value: `${weld.Rn.toFixed(2)} kips` }
+              ]),
               { eq: designEq, codeRef: designRef, value: `${weld.cap.toFixed(2)} kips` },
             ]}
             statCards={[

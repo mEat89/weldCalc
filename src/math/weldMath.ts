@@ -22,6 +22,7 @@ export interface WeldMetalResult {
   dcr: number | null;
   status: "OK" | "NG" | null;
   dirFactor: number;
+  beta: number;
 }
 
 export interface BaseMetalInput {
@@ -176,12 +177,26 @@ export function calcWeldMetal(input: WeldMetalInput): WeldMetalResult {
       : 1.0;
     const Fnw = 0.6 * fexx * dirFactor;
     const Rn = Fnw * Awe;
-    const cap = method === "lrfd" ? 0.75 * Rn : Rn / 2.0;
+
+    // AISC §J2.2b (Eq. J2-1) weld length reduction factor (beta) for longitudinal shear (theta = 0)
+    let beta = 1.0;
+    if (thetaDeg === 0) {
+      const ratio = length / legSize;
+      if (ratio > 100) {
+        beta = Math.max(1.2 - 0.002 * ratio, 0.6);
+        if (ratio > 300) {
+          beta = 0.60;
+        }
+      }
+    }
+
+    const RnReduced = Rn * beta;
+    const cap = method === "lrfd" ? 0.75 * RnReduced : RnReduced / 2.0;
 
     const dcr = appliedLoad > 0 ? appliedLoad / cap : null;
     const status = dcr === null ? null : dcr <= 1.0 ? "OK" : "NG";
     
-    return { te, Awe, Fnw, Rn, cap, dcr, status, dirFactor };
+    return { te, Awe, Fnw, Rn: RnReduced, cap, dcr, status, dirFactor, beta };
   } catch (error) {
     throw new Error(`Error calculating weld metal shear rupture: ${error instanceof Error ? error.message : String(error)}`);
   }
