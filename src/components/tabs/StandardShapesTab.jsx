@@ -227,8 +227,8 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
             </div>
 
             {loadCase === "trans" && (
-              <div style={{ marginTop: "4px", fontSize: "11px", backgroundColor: "#eff6ff", border: "1px solid #bfdbfe", padding: "4px 6px", borderRadius: "var(--radius-sm)" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "10px" }}>
+              <div style={{ marginTop: "4px", fontSize: "11px", backgroundColor: "var(--primary-light)", border: "1px solid var(--border-color)", color: "var(--primary-dark)", padding: "4px 6px", borderRadius: "var(--radius-sm)" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "10px", color: "inherit" }}>
                   <input
                     type="checkbox"
                     checked={!useDirectional}

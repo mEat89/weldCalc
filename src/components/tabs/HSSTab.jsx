@@ -497,68 +497,66 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
       <main className="app-main-content">
         {/* TOP 2-COLUMN CONTROL PANEL GRID (Compacted) */}
         <div className="top-controls-grid hss-top-grid">
-          {/* Column 1: Interactive SVG Diagram & Face Analysis (Side-by-Side) */}
-          <div className="card compact top-grid-card diagram-controls-card-side" style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "16px", alignItems: "center" }}>
-            <HssSvgDiagram
-              selectedFaceDim={selectedFaceDim}
-              branch={branch}
-              loadCase={loadCase}
-              angleDeg={angleDeg}
-            />
+          {/* Column 1: Interactive SVG Diagram (Standalone Card, matches other tabs) */}
+          <HssSvgDiagram
+            selectedFaceDim={selectedFaceDim}
+            branch={branch}
+            loadCase={loadCase}
+            angleDeg={angleDeg}
+          />
+          
+          {/* Column 2: Weld Face Selection & Branch Orientation (Standalone Card) */}
+          <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", gap: "10px", justifyContent: "center" }}>
             
-            {/* Weld Face Selection & Branch Orientation inline to the side of the diagram */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", height: "100%", justifyContent: "center" }}>
-              
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                <div className="card-section-label" style={{ margin: 0, paddingLeft: "6px", fontSize: "10px" }}>Weld Face to Analyze</div>
-                <div className="toggle-btn-grid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: "6px" }}>
-                  {FACE_TYPES.map((f) => {
-                    const active = selectedFaceDim === f.id;
-                    const k5ReductionApplies = lengthMode === "k5";
-                    const lengthStr = f.id === "B" ? `${branch.B}"` : `${branch.H}"`;
-                    const subLabel = k5ReductionApplies ? "K5 Reduced" : "Fully Effective";
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <div className="card-section-label" style={{ margin: 0, paddingLeft: "6px", fontSize: "10px" }}>Weld Face to Analyze</div>
+              <div className="toggle-btn-grid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: "6px" }}>
+                {FACE_TYPES.map((f) => {
+                  const active = selectedFaceDim === f.id;
+                  const k5ReductionApplies = lengthMode === "k5";
+                  const lengthStr = f.id === "B" ? `${branch.B}"` : `${branch.H}"`;
+                  const subLabel = k5ReductionApplies ? "K5 Reduced" : "Fully Effective";
 
-                    return (
-                      <button
-                        key={f.id}
-                        onClick={() => setSelectedFaceDim(f.id)}
-                        className={`toggle-option-btn compact ${active ? "active" : ""}`}
-                        type="button"
-                        style={{ padding: "6px 8px", fontSize: "10px", borderRadius: "var(--radius-sm)", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}
-                      >
-                        <div className="btn-main-label" style={{ fontSize: "10px", fontWeight: "700" }}>Face {f.id} ({lengthStr})</div>
-                        <div className="btn-sub-label" style={{ fontSize: "8.5px", margin: "2px 0 0 0", opacity: 0.8 }}>{subLabel}</div>
-                      </button>
-                    );
-                  })}
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => setSelectedFaceDim(f.id)}
+                      className={`toggle-option-btn compact ${active ? "active" : ""}`}
+                      type="button"
+                      style={{ padding: "6px 8px", fontSize: "10px", borderRadius: "var(--radius-sm)", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}
+                    >
+                      <div className="btn-main-label" style={{ fontSize: "10px", fontWeight: "700" }}>Face {f.id} ({lengthStr})</div>
+                      <div className="btn-sub-label" style={{ fontSize: "8.5px", margin: "2px 0 0 0", opacity: 0.8 }}>{subLabel}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {(connType === "hss2hss" || (connType === "hss2plate" && lengthMode === "k5")) && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", borderTop: "1px dashed var(--border-color)", paddingTop: "8px" }}>
+                <div className="card-section-label" style={{ margin: 0, paddingLeft: "6px", fontSize: "10px" }}>Branch Orientation</div>
+                <div className="toggle-btn-grid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: "6px" }}>
+                  <button
+                    onClick={() => setBranchTransverseDim("B")}
+                    className={`toggle-option-btn compact ${branchTransverseDim === "B" ? "active" : ""}`}
+                    type="button"
+                    style={{ padding: "6px 8px", fontSize: "9.5px", borderRadius: "var(--radius-sm)", textAlign: "center" }}
+                  >
+                    <div className="btn-main-label" style={{ fontSize: "9.5px", fontWeight: "700" }}>Branch B Transverse</div>
+                  </button>
+                  <button
+                    onClick={() => setBranchTransverseDim("H")}
+                    className={`toggle-option-btn compact ${branchTransverseDim === "H" ? "active" : ""}`}
+                    type="button"
+                    style={{ padding: "6px 8px", fontSize: "9.5px", borderRadius: "var(--radius-sm)", textAlign: "center" }}
+                  >
+                    <div className="btn-main-label" style={{ fontSize: "9.5px", fontWeight: "700" }}>Branch H Transverse</div>
+                  </button>
                 </div>
               </div>
+            )}
 
-              {(connType === "hss2hss" || (connType === "hss2plate" && lengthMode === "k5")) && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "4px", borderTop: "1px dashed var(--border-color)", paddingTop: "8px" }}>
-                  <div className="card-section-label" style={{ margin: 0, paddingLeft: "6px", fontSize: "10px" }}>Branch Orientation</div>
-                  <div className="toggle-btn-grid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: "6px" }}>
-                    <button
-                      onClick={() => setBranchTransverseDim("B")}
-                      className={`toggle-option-btn compact ${branchTransverseDim === "B" ? "active" : ""}`}
-                      type="button"
-                      style={{ padding: "6px 8px", fontSize: "9.5px", borderRadius: "var(--radius-sm)", textAlign: "center" }}
-                    >
-                      <div className="btn-main-label" style={{ fontSize: "9.5px", fontWeight: "700" }}>Branch B Transverse</div>
-                    </button>
-                    <button
-                      onClick={() => setBranchTransverseDim("H")}
-                      className={`toggle-option-btn compact ${branchTransverseDim === "H" ? "active" : ""}`}
-                      type="button"
-                      style={{ padding: "6px 8px", fontSize: "9.5px", borderRadius: "var(--radius-sm)", textAlign: "center" }}
-                    >
-                      <div className="btn-main-label" style={{ fontSize: "9.5px", fontWeight: "700" }}>Branch H Transverse</div>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-            </div>
           </div>
 
           {/* Column 2: Load case / direction (Compacted) */}
@@ -599,13 +597,13 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
             </div>
 
             {loadCase === "trans" && (
-              <div style={{ marginTop: "4px", fontSize: "11px", backgroundColor: "#eff6ff", border: "1px solid #bfdbfe", padding: "4px 6px", borderRadius: "var(--radius-sm)" }}>
+              <div style={{ marginTop: "4px", fontSize: "11px", backgroundColor: "var(--primary-light)", border: "1px solid var(--border-color)", color: "var(--primary-dark)", padding: "4px 6px", borderRadius: "var(--radius-sm)" }}>
                 {lockDirectional ? (
-                  <span style={{ color: "var(--primary-dark)", fontWeight: "600", fontSize: "10px" }}>
+                  <span style={{ color: "inherit", fontWeight: "600", fontSize: "10px" }}>
                     kds = 1.0 Locked: {connType === "hss2hss" ? "HSS branch weld non-uniformity" : "K5 Be mode"}
                   </span>
                 ) : (
-                  <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "10px" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "10px", color: "inherit" }}>
                     <input
                       type="checkbox"
                       checked={!useDirectional}
