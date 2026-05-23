@@ -239,19 +239,7 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
             </Field>
           </div>
 
-          <div style={{ marginTop: "8px", borderTop: "1px solid var(--border-color)", paddingTop: "8px" }}>
-            <Field label="Demand, P (kips)">
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={appliedLoad}
-                onChange={(e) => setAppliedLoad(parseFloat(e.target.value) || 0)}
-                className="form-input compact"
-                style={{ padding: "4px 6px" }}
-              />
-            </Field>
-          </div>
+
         </div>
       </aside>
 
@@ -333,6 +321,21 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
                 />
               </div>
             )}
+            <div style={{ marginTop: "10px", paddingTop: "8px", borderTop: "1px dashed var(--border-color)" }}>
+              <label htmlFor="demand-input" style={{ fontSize: "12px", fontWeight: "700", color: "var(--primary-dark)", display: "block", marginBottom: "4px" }}>
+                Acting Axial Force, P (kips)
+              </label>
+              <input
+                id="demand-input"
+                type="number"
+                min="0"
+                step="0.5"
+                value={appliedLoad}
+                onChange={(e) => setAppliedLoad(parseFloat(e.target.value) || 0)}
+                className="form-input"
+                style={{ fontSize: "13.5px", fontWeight: "700", padding: "6px 10px", borderColor: "var(--primary)", backgroundColor: "var(--primary-light)" }}
+              />
+            </div>
           </div>
 
           {/* Column 3: AISC 360-16 Weld Reference Guide */}

@@ -188,15 +188,10 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
 
   const faceDescription = (() => {
     const dimLabel = `length = ${selectedFaceDim} = ${selectedFaceNominal}"`;
-    if (connType === "hss2plate") {
-      if (lengthMode === "k5") {
-        return `Face along ${selectedFaceDim} (${dimLabel}) — K5 Be reduction applied (engineering judgment)`;
-      }
-      return `Face along ${selectedFaceDim} (${dimLabel}) — full nominal length per AISC`;
+    if (lengthMode === "k5") {
+      return `Face along ${selectedFaceDim} (${dimLabel}) — K5 Be reduction applied`;
     }
-    return isTransverseFace
-      ? `Face along ${selectedFaceDim} — TRANSVERSE to chord (${dimLabel}) — K5 reduction applies`
-      : `Face along ${selectedFaceDim} — PARALLEL to chord (${dimLabel}) — fully effective`;
+    return `Face along ${selectedFaceDim} (${dimLabel}) — full nominal length per AISC`;
   })();
 
   const activeLengthMethods = LENGTH_METHODS.filter((m) => m.id !== "cbfem");
@@ -209,7 +204,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
     let codeRef = "";
     if (lengthMode === "k5" && connType === "hss2plate") {
       codeRef = "AISC 360 §K5 Eq. K1-1 (engineering judgment — plate as chord)";
-      if (isTransverseFace && k5) {
+      if (k5) {
         traceSteps = [
           { eq: `Chord B (HSS face dim) = ${selectedFaceNominal}"`, codeRef: "HSS face dimension used as plate chord proxy", value: `${selectedFaceNominal} in` },
           { eq: `B/t (plate) = ${selectedFaceNominal} / ${plateT.toFixed(4)} = ${k5.Bt.toFixed(2)}`, codeRef: "Plate slenderness ratio (face dim / plate thickness)", value: k5.Bt.toFixed(2) },
@@ -218,24 +213,16 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
           { eq: `Be = min(Be_raw, Bb) = min(${k5.beRaw.toFixed(3)}, ${selectedFaceNominal})`, codeRef: k5.capped ? "Capped at Bb" : "Be < Bb — reduction governs", value: `${k5.be.toFixed(3)} in` },
           { eq: `L_eff (this face) = Be`, codeRef: "K5 reduction width applied to selected face", value: `${k5.be.toFixed(3)} in` },
         ];
-      } else {
-        traceSteps = [
-          { eq: `Face is parallel to bending axis`, codeRef: "K5 mode: K5 applies only to transverse welds", value: "—" },
-          { eq: `L_eff (this face) = ${selectedFaceNominal}" (nominal)`, codeRef: "Longitudinal welds fully effective", value: `${selectedFaceNominal} in` },
-        ];
       }
-    } else if (connType === "hss2hss" && k5) {
+    } else if (lengthMode === "k5" && connType === "hss2hss" && k5) {
       codeRef = "AISC 360 §K5 Eq. K1-1, Table K5.1";
-      traceSteps = isTransverseFace ? [
-        { eq: `β = Bb / B = ${transverseLen} / ${chord.B} = ${k5.beta.toFixed(3)}`, codeRef: "Width ratio checking (§K1)", value: k5.beta > 1.0 ? "β > 1 — invalid" : "OK" },
+      traceSteps = [
+        { eq: `β = Bb / B = ${selectedFaceNominal} / ${chord.B} = ${k5.beta.toFixed(3)}`, codeRef: "Width ratio checking (§K1)", value: k5.beta > 1.0 ? "β > 1 — invalid" : "OK" },
         { eq: `B/t = ${chord.B} / ${chord.tDes.toFixed(4)} = ${k5.Bt.toFixed(2)}`, codeRef: "Chord member wall slenderness", value: k5.Bt.toFixed(2) },
         { eq: `Be_raw = (10/(B/t))·(Fy·t / (Fyb·tb))·Bb`, codeRef: "AISC 360 §K5 Eq. K1-1", value: `${k5.beRaw.toFixed(3)} in` },
-        { eq: `     = (10/${k5.Bt.toFixed(2)})·(${chordGrade.fy}·${chord.tDes.toFixed(4)} / (${branchGrade.fy}·${branch.tDes.toFixed(4)}))·${transverseLen}`, codeRef: "Substituted properties", value: `${k5.beRaw.toFixed(3)} in` },
-        { eq: `Be = min(Be_raw, Bb) = min(${k5.beRaw.toFixed(3)}, ${transverseLen})`, codeRef: k5.capped ? "Capped at Bb (§K5 limit)" : "Be < Bb — reduction governs", value: `${k5.be.toFixed(3)} in` },
-        { eq: `L_eff (this face) = Be`, codeRef: "Transverse face weld effective length", value: `${k5.be.toFixed(3)} in` },
-      ] : [
-        { eq: `Selected face is PARALLEL to chord axis`, codeRef: "AISC 360 §K5 Table K5.1", value: "—" },
-        { eq: `L_eff (this face) = ${parallelLen}" (nominal)`, codeRef: "Longitudinal weld lines fully effective", value: `${parallelLen} in` },
+        { eq: `     = (10/${k5.Bt.toFixed(2)})·(${chordGrade.fy}·${chord.tDes.toFixed(4)} / (${branchGrade.fy}·${branch.tDes.toFixed(4)}))·${selectedFaceNominal}`, codeRef: "Substituted properties", value: `${k5.beRaw.toFixed(3)} in` },
+        { eq: `Be = min(Be_raw, Bb) = min(${k5.beRaw.toFixed(3)}, ${selectedFaceNominal})`, codeRef: k5.capped ? "Capped at Bb (§K5 limit)" : "Be < Bb — reduction governs", value: `${k5.be.toFixed(3)} in` },
+        { eq: `L_eff (this face) = Be`, codeRef: "Weld effective length with K5 reduction", value: `${k5.be.toFixed(3)} in` },
       ];
     } else {
       codeRef = "AISC 360-22 §J2.4 — full nominal length";
@@ -480,18 +467,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
             </Field>
           </div>
 
-          <div className="mt-1">
-            <Field label="Force P_face (kips)">
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={pFace}
-                onChange={(e) => setPFace(parseFloat(e.target.value) || 0)}
-                className="form-input compact"
-              />
-            </Field>
-          </div>
+
 
           <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: "4px", display: "flex", flexDirection: "column", gap: "2px", marginTop: "4px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px" }}>
@@ -545,9 +521,8 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
           
           {/* Column 2: Weld Face Selection & Branch Orientation (Standalone Card) */}
           <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", gap: "10px", justifyContent: "center" }}>
-            
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-              <div className="card-section-label" style={{ margin: 0, paddingLeft: "6px", fontSize: "10px" }}>Weld Face to Analyze</div>
+              <div className="card-section-label" style={{ margin: 0, paddingLeft: "6px", fontSize: "10px" }}>Weld Line to Analyze (analyzes single line at a time)</div>
               <div className="toggle-btn-grid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: "6px" }}>
                 {FACE_TYPES.map((f) => {
                   const active = selectedFaceDim === f.id;
@@ -564,10 +539,13 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                       style={{ padding: "6px 8px", fontSize: "10px", borderRadius: "var(--radius-sm)", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}
                     >
                       <div className="btn-main-label" style={{ fontSize: "10px", fontWeight: "700" }}>Face {f.id} ({lengthStr})</div>
-                      <div className="btn-sub-label" style={{ fontSize: "8.5px", margin: "2px 0 0 0", opacity: 0.8 }}>{subLabel}</div>
+                      <div className="btn-sub-label" style={{ fontSize: "9px", marginTop: "2px" }}>{subLabel}</div>
                     </button>
                   );
                 })}
+              </div>
+              <div style={{ fontSize: "10.5px", color: "var(--text-muted)", marginTop: "4px", lineHeight: "1.25", fontStyle: "italic", paddingLeft: "6px" }}>
+                ℹ️ The calculator analyzes a single weld line at a time. The effective length (Leff) and capacities are unitary and are not multiplied by 2.
               </div>
             </div>
 
@@ -671,6 +649,21 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                 />
               </div>
             )}
+            <div style={{ marginTop: "10px", paddingTop: "8px", borderTop: "1px dashed var(--border-color)" }}>
+              <label htmlFor="demand-input" style={{ fontSize: "12px", fontWeight: "700", color: "var(--primary-dark)", display: "block", marginBottom: "4px" }}>
+                Acting Axial Force, P (kips)
+              </label>
+              <input
+                id="demand-input"
+                type="number"
+                min="0"
+                step="0.5"
+                value={pFace}
+                onChange={(e) => setPFace(parseFloat(e.target.value) || 0)}
+                className="form-input"
+                style={{ fontSize: "13.5px", fontWeight: "700", padding: "6px 10px", borderColor: "var(--primary)", backgroundColor: "var(--primary-light)" }}
+              />
+            </div>
           </div>
         </div>
 
