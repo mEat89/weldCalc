@@ -49,7 +49,6 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
   const [angleDeg, setAngleDeg] = useState(90);
   const [legSize, setLegSize] = useState(0.25);
   const [fexx, setFexx] = useState(70);
-  const [method, setMethod] = useState("lrfd");
   const [pFace, setPFace] = useState(0);
   const [useDirectional, setUseDirectional] = useState(false);
   const [overrideLength, setOverrideLength] = useState(false);
@@ -150,11 +149,11 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
     try {
       weld = calcWeldMetal({
         legSize, length: faceLen.length, fexx, thetaDeg, nLines: 1,
-        method, useDirectional: effectiveUseDirectional, appliedLoad: pFace,
+        method: "lrfd", useDirectional: effectiveUseDirectional, appliedLoad: pFace,
       });
       base = calcBaseMetal({
         baseT, fy: baseFy, fu: baseFu, length: faceLen.length, nLines: 1,
-        method, appliedLoad: pFace,
+        method: "lrfd", appliedLoad: pFace,
       });
       size = calcWeldSize({ legSize, baseT });
     } catch (e) { calcError = e instanceof Error ? e.message : String(e); }
@@ -181,9 +180,9 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
             ? "kds=1.0 in K5 Be mode — engineering judgment consistent with the conservative effective-width extension"
             : "AISC 360-22 §J2.4 — directional increase available but user has it disabled (conservative)"));
 
-  const designEq = method === "lrfd" ? "φRn = 0.75·Rn" : "Rn/Ω = Rn / 2.00";
-  const designRef = method === "lrfd" ? "AISC 360-16 §J2.4 — LRFD resistance factor" : "AISC 360-16 §J2.4 — ASD safety factor";
-  const capLabel = method === "lrfd" ? "φRn (LRFD)" : "Rn/Ω (ASD)";
+  const designEq = "φRn = 0.75·Rn";
+  const designRef = "AISC 360-16 §J2.4 — LRFD resistance factor";
+  const capLabel = "φRn (LRFD)";
 
   const faceDescription = (() => {
     const dimLabel = `length = ${selectedFaceDim} = ${selectedFaceNominal}"`;
@@ -428,7 +427,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                 onChange={(e) => setLegSize(parseFloat(e.target.value))}
                 className="form-select compact"
               >
-                {LEG_SIZES.map((s) => <option key={s.value} value={s.value}>{s.label.split(" ")[0]}</option>)}
+                {LEG_SIZES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </Field>
 
@@ -444,7 +443,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
             </Field>
           </div>
 
-          <div className="sidebar-two-col-grid mt-1">
+          <div className="mt-1">
             <Field label="Force P_face (kips)">
               <input
                 type="number"
@@ -454,18 +453,6 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                 onChange={(e) => setPFace(parseFloat(e.target.value) || 0)}
                 className="form-input compact"
               />
-            </Field>
-
-            <Field label="Method" id="design-method-select">
-              <select
-                id="design-method-select"
-                value={method}
-                onChange={(e) => setMethod(e.target.value)}
-                className="form-select compact"
-              >
-                <option value="lrfd">LRFD</option>
-                <option value="asd">ASD</option>
-              </select>
             </Field>
           </div>
 
@@ -485,7 +472,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                 }}
                 style={{ cursor: "pointer" }}
               />
-              <span>Override length</span>
+              <span>Override weld Effective Length</span>
             </label>
 
             {overrideLength && (
@@ -554,7 +541,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                     type="button"
                     style={{ padding: "6px 8px", fontSize: "9.5px", borderRadius: "var(--radius-sm)", textAlign: "center" }}
                   >
-                    <div className="btn-main-label" style={{ fontSize: "9.5px", fontWeight: "700" }}>Branch B Transverse</div>
+                    <div className="btn-main-label" style={{ fontSize: "9.5px", fontWeight: "700" }}>Branch Width (B) perpendicular to chord axis</div>
                   </button>
                   <button
                     onClick={() => setBranchTransverseDim("H")}
@@ -562,7 +549,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                     type="button"
                     style={{ padding: "6px 8px", fontSize: "9.5px", borderRadius: "var(--radius-sm)", textAlign: "center" }}
                   >
-                    <div className="btn-main-label" style={{ fontSize: "9.5px", fontWeight: "700" }}>Branch H Transverse</div>
+                    <div className="btn-main-label" style={{ fontSize: "9.5px", fontWeight: "700" }}>Branch Height (H) perpendicular to chord axis</div>
                   </button>
                 </div>
               </div>
@@ -792,12 +779,12 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                 codeRef: "AISC 360-16 base shear critical area", value: `${base.A.toFixed(3)} in²` },
               { eq: `Yielding: Rn = 0.60·Fy·A = 0.60·${baseFy}·${base.A.toFixed(3)}`,
                 codeRef: "AISC 360-16 Eq. J4-3", value: `${base.RnYield.toFixed(2)} kips` },
-              { eq: method === "lrfd" ? "φRn (yield) = 1.00·Rn" : "Rn/Ω (yield) = Rn / 1.50",
-                codeRef: method === "lrfd" ? "φ = 1.00" : "Ω = 1.50", value: `${base.capYield.toFixed(2)} kips` },
+              { eq: "φRn (yield) = 1.00·Rn",
+                codeRef: "φ = 1.00", value: `${base.capYield.toFixed(2)} kips` },
               { eq: `Rupture: Rn = 0.60·Fu·A = 0.60·${baseFu}·${base.A.toFixed(3)}`,
                 codeRef: "AISC 360-16 Eq. J4-4", value: `${base.RnRupture.toFixed(2)} kips` },
-              { eq: method === "lrfd" ? "φRn (rupture) = 0.75·Rn" : "Rn/Ω (rupture) = Rn / 2.00",
-                codeRef: method === "lrfd" ? "φ = 0.75" : "Ω = 2.00", value: `${base.capRupture.toFixed(2)} kips` },
+              { eq: "φRn (rupture) = 0.75·Rn",
+                codeRef: "φ = 0.75", value: `${base.capRupture.toFixed(2)} kips` },
               { eq: `Governing: ${base.governs} (lower limit)`,
                 codeRef: "min(yield cap, rupture cap)", value: `${base.cap.toFixed(2)} kips` },
             ]}

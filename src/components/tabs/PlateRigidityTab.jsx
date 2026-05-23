@@ -31,9 +31,6 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
   const [tuMode, setTuMode] = useState("auto");
   const [tuManual, setTuManual] = useState(0);
 
-  // Method
-  const [method, setMethod] = useState("lrfd");
-
   // Derived metrics
   const Mu = Mu_ftkip * 12; // convert to kip·in
   const plateGrade = STEEL_GRADES[plateGradeIdx] || STEEL_GRADES[0];
@@ -157,7 +154,7 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
           <div className="card-section-label">Plate geometry &amp; material</div>
           
           <div className="sidebar-two-col-grid">
-            <InchInput label="N (length along M)" value={Nplate} onChange={setNplate} min={1} step={0.5} id="plate-n" />
+            <InchInput label="N (length along M)" value={Nplate} onChange={setNplate} min={1} step={0.5} id="plate-n" suppress16ths={true} />
             <InchInput
               label="B (width perp to M)"
               value={Bplate}
@@ -165,6 +162,7 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
               min={1}
               step={0.5}
               id="plate-b"
+              suppress16ths={true}
             />
           </div>
 
@@ -201,28 +199,6 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
           </div>
         </div>
 
-        {/* Design method */}
-        <div className="card compact shadow-sm border-0">
-          <div className="card-section-label">Design method</div>
-          <div className="toggle-btn-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
-            <button
-              onClick={() => setMethod("lrfd")}
-              className={`toggle-option-btn compact ${method === "lrfd" ? "active" : ""}`}
-              type="button"
-              style={{ padding: "6px", fontSize: "11px" }}
-            >
-              <div className="btn-main-label" style={{ fontSize: "11px", fontWeight: "700" }}>LRFD (φ=0.90)</div>
-            </button>
-            <button
-              onClick={() => setMethod("asd")}
-              className={`toggle-option-btn compact ${method === "asd" ? "active" : ""}`}
-              type="button"
-              style={{ padding: "6px", fontSize: "11px" }}
-            >
-              <div className="btn-main-label" style={{ fontSize: "11px", fontWeight: "700" }}>ASD (info)</div>
-            </button>
-          </div>
-        </div>
       </aside>
 
       {/* 2. Right Main Panel */}
@@ -323,6 +299,7 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
                 min={0.25}
                 step={0.25}
                 id="anchor-y"
+                suppress16ths={true}
               />
               <Field label="Cantilever, x">
                 <input value={`${x.toFixed(2)} in`} disabled className="form-input compact disabled" style={{ padding: "4px 6px" }} />

@@ -13,7 +13,6 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
   const [nLines, setNLines] = useState(2);
   const [angleDeg, setAngleDeg] = useState(45);
   const [fexx, setFexx] = useState(70);
-  const [method, setMethod] = useState("lrfd");
   const [appliedLoad, setAppliedLoad] = useState(0);
   const [useDirectional, setUseDirectional] = useState(true);
 
@@ -36,9 +35,9 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
   let weld = null, base = null, size = null, calcError = null;
   try {
     weld = calcWeldMetal({
-      legSize, length, fexx, thetaDeg, nLines, method, useDirectional, appliedLoad,
+      legSize, length, fexx, thetaDeg, nLines, method: "lrfd", useDirectional, appliedLoad,
     });
-    base = calcBaseMetal({ baseT, fy: baseFy, fu: baseFu, length, nLines, method, appliedLoad });
+    base = calcBaseMetal({ baseT, fy: baseFy, fu: baseFu, length, nLines, method: "lrfd", appliedLoad });
     size = calcWeldSize({ legSize, baseT });
   } catch (e) { calcError = e instanceof Error ? e.message : String(e); }
 
@@ -56,9 +55,9 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
   const fnwRef = useDirectional
     ? `AISC 360-16 §J2.4, Eq. J2-5 (θ = ${thetaDeg}°)`
     : "AISC 360-16 §J2.4 (directional increase suppressed)";
-  const designEq = method === "lrfd" ? "φRn = 0.75·Rn" : "Rn/Ω = Rn / 2.00";
-  const designRef = method === "lrfd" ? "AISC 360-16 §J2.4 — LRFD resistance factor" : "AISC 360-16 §J2.4 — ASD safety factor";
-  const capLabel = method === "lrfd" ? "φRn (LRFD)" : "Rn/Ω (ASD)";
+  const designEq = "φRn = 0.75·Rn";
+  const designRef = "AISC 360-16 §J2.4 — LRFD resistance factor";
+  const capLabel = "φRn (LRFD)";
 
   return (
     <div className="app-layout">
@@ -143,7 +142,7 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
           
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <div className="sidebar-two-col-grid">
-              <InchInput label="Member thickness" value={memberT} onChange={setMemberT} id="member-thickness" />
+              <InchInput label="Member thickness" value={memberT} onChange={setMemberT} id="member-thickness" suppress16ths={true} />
               <Field label="Member grade" id="member-grade">
                 <select
                   id="member-grade"
@@ -159,7 +158,7 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
             </div>
             
             <div className="sidebar-two-col-grid">
-              <InchInput label="Plate thickness, tp" value={plateT} onChange={setPlateT} id="plate-thickness" />
+              <InchInput label="Plate thickness, tp" value={plateT} onChange={setPlateT} id="plate-thickness" suppress16ths={true} />
               <Field label="Plate grade" id="plate-grade">
                 <select
                   id="plate-grade"
@@ -272,7 +271,7 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
                   className="form-select compact"
                   style={{ padding: "4px 6px" }}
                 >
-                  {LEG_SIZES.map((s) => <option key={s.value} value={s.value}>{s.label.split(" ")[0]}</option>)}
+                  {LEG_SIZES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </Field>
 
@@ -315,7 +314,7 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
               </Field>
             </div>
 
-            <div className="sidebar-two-col-grid" style={{ marginTop: "2px", borderTop: "1px solid var(--border-color)", paddingTop: "4px" }}>
+            <div style={{ marginTop: "2px", borderTop: "1px solid var(--border-color)", paddingTop: "4px" }}>
               <Field label="Demand, P (kips)">
                 <input
                   type="number"
@@ -326,19 +325,6 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
                   className="form-input compact"
                   style={{ padding: "4px 6px" }}
                 />
-              </Field>
-
-              <Field label="Method" id="method-select">
-                <select
-                  id="method-select"
-                  value={method}
-                  onChange={(e) => setMethod(e.target.value)}
-                  className="form-select compact"
-                  style={{ padding: "4px 6px" }}
-                >
-                  <option value="lrfd">LRFD</option>
-                  <option value="asd">ASD</option>
-                </select>
               </Field>
             </div>
           </div>
@@ -387,12 +373,12 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
                 codeRef: "AISC 360-16 §J4.2 base shear critical area", value: `${base.A.toFixed(3)} in²` },
               { eq: `Yielding: Rn = 0.60·Fy·A = 0.60·${baseFy}·${base.A.toFixed(3)}`,
                 codeRef: "AISC 360-16 §J4.2(a) Eq. J4-3", value: `${base.RnYield.toFixed(2)} kips` },
-              { eq: method === "lrfd" ? "φRn (yield) = 1.00·Rn" : "Rn/Ω (yield) = Rn / 1.50",
-                codeRef: method === "lrfd" ? "φ = 1.00" : "Ω = 1.50", value: `${base.capYield.toFixed(2)} kips` },
+              { eq: "φRn (yield) = 1.00·Rn",
+                codeRef: "φ = 1.00", value: `${base.capYield.toFixed(2)} kips` },
               { eq: `Rupture: Rn = 0.60·Fu·A = 0.60·${baseFu}·${base.A.toFixed(3)}`,
-                codeRef: "AISC 360-16 §J4.2(b) Eq. J4-4", value: `${base.RnRupture.toFixed(2)} kips` },
-              { eq: method === "lrfd" ? "φRn (rupture) = 0.75·Rn" : "Rn/Ω (rupture) = Rn / 2.00",
-                codeRef: method === "lrfd" ? "φ = 0.75" : "Ω = 2.00", value: `${base.capRupture.toFixed(2)} kips` },
+                codeRef: "AISC 360-16 Eq. J4-4", value: `${base.RnRupture.toFixed(2)} kips` },
+              { eq: "φRn (rupture) = 0.75·Rn",
+                codeRef: "φ = 0.75", value: `${base.capRupture.toFixed(2)} kips` },
               { eq: `Governing: ${base.governs} (lower strength)`,
                 codeRef: "min(yield cap, rupture cap)", value: `${base.cap.toFixed(2)} kips` },
             ]}

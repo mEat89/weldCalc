@@ -20,8 +20,10 @@ export function Field({ label, children, helper, id }) {
 /**
  * Numeric input specifically for dimensions, featuring automatic fraction/16ths badge overlays
  */
-export function InchInput({ label, value, onChange, min = 0.01, step = 0.0625, id }) {
-  const fractionLabel = value > 0 ? `≈ ${toFraction(value)} (${to16ths(value)})` : "";
+export function InchInput({ label, value, onChange, min = 0.01, step = 0.0625, id, suppress16ths = false }) {
+  const fractionLabel = value > 0
+    ? (suppress16ths ? `≈ ${toFraction(value)}` : `≈ ${toFraction(value)} (${to16ths(value)})`)
+    : "";
   return (
     <Field label={label} helper={fractionLabel} id={id}>
       <input

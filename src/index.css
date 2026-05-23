@@ -54,6 +54,7 @@
 
 /* ─── Dark Theme ─── */
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg-app: #0f1117;
   --text-main: #e5e7eb;
   --text-muted: #9ca3af;
@@ -298,6 +299,16 @@ body {
   border-radius: var(--radius-sm);
   outline: none;
   transition: var(--transition);
+}
+
+/* Hide number input spinners globally */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
 }
 
 .form-input:focus, .form-select:focus {
@@ -719,12 +730,12 @@ body {
 }
 
 .governing-summary-card.pass {
-  background-color: hsl(142, 60%, 97%);
+  background-color: var(--success-bg);
   border-color: var(--success);
 }
 
 .governing-summary-card.fail {
-  background-color: hsl(0, 70%, 98%);
+  background-color: var(--danger-bg);
   border-color: var(--danger);
 }
 
@@ -834,12 +845,12 @@ body {
 }
 
 .verdict-summary-card.pass {
-  background: linear-gradient(135deg, hsl(142, 60%, 97%), #ffffff);
+  background: linear-gradient(135deg, var(--success-bg), var(--card-bg));
   border-color: var(--success);
 }
 
 .verdict-summary-card.fail {
-  background: linear-gradient(135deg, hsl(0, 60%, 98%), #ffffff);
+  background: linear-gradient(135deg, var(--danger-bg), var(--card-bg));
   border-color: var(--danger);
 }
 
