@@ -8,4 +8,24 @@ export default defineConfig({
   test: {
     globals: true,
   },
+  build: {
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('jspdf') || id.includes('jspdf-autotable')) {
+              return 'pdf-vendor';
+            }
+            if (id.includes('docx')) {
+              return 'docx-vendor';
+            }
+            if (id.includes('react')) {
+              return 'react-vendor';
+            }
+          }
+        }
+      }
+    }
+  }
 })
