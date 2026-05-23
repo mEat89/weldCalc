@@ -25,7 +25,7 @@ export default function HssSvgDiagram({
   return (
     <div className="svg-diagram-container">
       <div className="svg-diagram-title">Interactive Connection Interface (Top-Down View)</div>
-      <svg className="technical-drawing" width="360" height="200" viewBox="0 0 400 200">
+      <svg className="technical-drawing" width="360" height="150" viewBox="0 15 400 170">
         {/* Background area */}
         <rect x="30" y="20" width="340" height="160" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1" rx="4" />
 

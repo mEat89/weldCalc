@@ -11,8 +11,8 @@ export default function ShapesSvgDiagram({ shape, loadCase, angleDeg }: ShapesSv
   return (
     <div className="svg-diagram-container">
       <div className="svg-diagram-title">Interactive Configuration & Weld Path</div>
-      <svg className="technical-drawing" width="360" height="200" viewBox="0 0 400 200">
-        <rect x="20" y="15" width="360" height="170" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1" rx="4" />
+      <svg className="technical-drawing" width="360" height="150" viewBox="0 15 400 170">
+        <rect x="20" y="15" width="360" height="160" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1" rx="4" />
 
         {activePreset === "i2plate" && (
           <>

@@ -2,10 +2,25 @@ import React, { useState, useRef } from "react";
 import { STEEL_GRADES, LEG_SIZES, FEXX_OPTIONS, SHAPE_PRESETS, LOAD_CASES } from "../../constants/steelData";
 import { calcWeldMetal, calcBaseMetal, calcWeldSize, toFraction, to16ths } from "../../math/weldMath";
 import { Field, PlateThicknessSelect, SteelGradeSelect } from "../shared/FormElements";
-import { CheckBlock } from "../shared/CheckResults";
+import { CheckBlock, InfoTooltip } from "../shared/CheckResults";
 import ShapesSvgDiagram from "../shared/ShapesSvgDiagram";
 import ReportActions from "../shared/ReportActions";
 import { buildStandardShapesReport } from "../../reports/buildStandardShapesReport";
+
+const TOOLTIP_DATA = {
+  weldMetal: [
+    { text: "Checks shear rupture of the fillet weld throat under acting load. The design strength is calculated as φRn = φ·Fnw·Awe, where Awe = 0.707·w·L·nLines and Fnw = 0.6·FEXX·(1 + 0.5·sin^1.5 θ). This assumes uniform shear stress over the throat area and includes the permitted directional load angle increase factor." },
+    { label: "AISC Reference", text: "AISC 360 Section J2.4." }
+  ],
+  baseMetal: [
+    { text: "Verifies the connected thinner base material does not fail in shear yielding or rupture. The design strength is governed by the minimum of yielding capacity (φRn = 1.0·0.6·Fy·t·L·nLines) and rupture capacity (φRn = 0.75·0.6·Fu·t·L·nLines), assuming a uniform shear stress distribution through the material thickness." },
+    { label: "AISC Reference", text: "AISC 360 Section J4.2." }
+  ],
+  weldSize: [
+    { text: "Ensures the selected fillet weld leg size is within code limits to guarantee joint structural integrity. The leg size is checked against minimum size requirements (based on thicker parts to prevent rapid cooling cracks) and maximum size limits (based on thinner parts to prevent weld throat wash-away)." },
+    { label: "AISC Reference", text: "AISC 360 Section J2.2b & Table J2.4." }
+  ]
+};
 
 export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLegendOpen, setRefsOpen, darkMode, toggleDarkMode, reportMeta, setReportMeta }) {
   const diagramRef = useRef(null);
@@ -389,6 +404,7 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
           <CheckBlock
             title="Check 1: Weld metal shear rupture"
             codeRef="AISC 360-16 §J2.4"
+            tooltipSections={TOOLTIP_DATA.weldMetal}
             traceSteps={[
               { eq: "te = 0.707·w", codeRef: "AISC 360-16 §J2.2a throat definition", value: `${weld.te.toFixed(4)} in` },
               { eq: `Awe = te·L·n = ${weld.te.toFixed(4)}·${length}·${nLines}`,
@@ -419,6 +435,7 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
           <CheckBlock
             title={`Check 2: Base metal shear (${baseLabel})`}
             codeRef="AISC 360-16 §J4.2"
+            tooltipSections={TOOLTIP_DATA.baseMetal}
             traceSteps={[
               { eq: `A = t·L·n = ${baseT.toFixed(4)}·${length}·${nLines}`,
                 codeRef: "AISC 360-16 §J4.2 base shear critical area", value: `${base.A.toFixed(3)} in²` },
@@ -427,14 +444,14 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
               { eq: "φRn (yield) = 1.00·Rn",
                 codeRef: "φ = 1.00", value: `${base.capYield.toFixed(2)} kips` },
               { eq: `Rupture: Rn = 0.60·Fu·A = 0.60·${baseFu}·${base.A.toFixed(3)}`,
-                codeRef: "AISC 360-16 Eq. J4-4", value: `${base.RnRupture.toFixed(2)} kips` },
+                codeRef: "AISC 360-16 §J4.2(b) Eq. J4-4", value: `${base.RnRupture.toFixed(2)} kips` },
               { eq: "φRn (rupture) = 0.75·Rn",
                 codeRef: "φ = 0.75", value: `${base.capRupture.toFixed(2)} kips` },
-              { eq: `Governing: ${base.governs} (lower strength)`,
+              { eq: `Governing: ${base.governs} (lower limit)`,
                 codeRef: "min(yield cap, rupture cap)", value: `${base.cap.toFixed(2)} kips` },
             ]}
             statCards={[
-              { label: `${baseLabel} Fy / Fu`, value: `${baseFy} / ${baseFu} ksi` },
+              { label: `${baseLabel} Fy / Fu`, value: `${baseFy}/${baseFu} ksi` },
               { label: `Governs: ${base.governs}`, value: `${base.cap.toFixed(2)} kips` },
               { label: "DCR", value: base.dcr !== null ? base.dcr.toFixed(3) : "—" },
             ]}
@@ -445,11 +462,12 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
           />
         )}
 
-        {/* Check 3: Weld Size limits */}
+        {/* Check 3: Weld size limits (Collapsible) */}
         {size && (
           <CheckBlock
             title="Check 3: Weld size limits"
             codeRef="AISC 360-16 §J2.2b, Table J2.4"
+            tooltipSections={TOOLTIP_DATA.weldSize}
             traceSteps={[
               { eq: `Provided: w = ${toFraction(legSize)}`, codeRef: "Selected fillet weld size", value: to16ths(legSize) },
               { eq: `Min for t = ${toFraction(baseT)}: w_min = ${size.minLabel}`,

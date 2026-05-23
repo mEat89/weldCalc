@@ -3,10 +3,21 @@ import { HSS_SHAPES, STEEL_GRADES } from "../../constants/steelData";
 import { toFraction } from "../../math/weldMath";
 import { calcAnchorTensionAuto, calcMethodB, calcDG1, calcRigidityVerdict } from "../../math/plateMath";
 import { Field, InchInput, PlateThicknessSelect, HssMemberSelect, SteelGradeSelect } from "../shared/FormElements";
-import { CheckBlock } from "../shared/CheckResults";
+import { CheckBlock, InfoTooltip } from "../shared/CheckResults";
 import RigiditySvgDiagram from "../shared/RigiditySvgDiagram";
 import ReportActions from "../shared/ReportActions";
 import { buildRigidityReport } from "../../reports/buildRigidityReport";
+
+const TOOLTIP_DATA = {
+  flexuralYield: [
+    { text: "Evaluates the plastic bending capacity of the cantilevered portion of the base plate. It calculates the plastic section modulus Zp = b·tp^2 / 4 and compares the moment demand Mu to the design capacity φMn = φ·Fy·Zp (where φ = 0.90), assuming the plate bends plastically along critical yield lines under bearing compression or anchor tension." },
+    { label: "AISC Reference", text: "AISC Chapter F & AISC Design Guide 1." }
+  ],
+  bendingRigidity: [
+    { text: "Checks if the base plate is thick enough to behave as a rigid plate under tension per the Thornton base plate model. A base plate thicker than the calculated limit behaves rigidly, maintaining elastic bending boundaries and preventing excessive anchor prying or force magnification." },
+    { label: "AISC Reference", text: "AISC Design Guide 1 / Thornton Method." }
+  ]
+};
 
 export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLegendOpen, setRefsOpen, darkMode, toggleDarkMode, reportMeta, setReportMeta }) {
   const diagramRef = useRef(null);
@@ -344,6 +355,7 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
           <CheckBlock
             title="Check 1 — Method B: Elastic Plate Bending"
             codeRef="σmax = 6·Tu·x / (beff·t²) ≤ Fy"
+            tooltipSections={TOOLTIP_DATA.bendingRigidity}
             traceSteps={mB.trivial ? [
               { eq: "T_u = 0 → no tension demand",
                 codeRef: "Skipped — no anchor tension",
@@ -384,6 +396,7 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
           <CheckBlock
             title="Check 2 — AISC DG1 §3.4 Plastic Cantilever"
             codeRef="AISC Eq. 3.4.7 form: t ≥ √(4·Tu·x / (φ·Fy·beff))"
+            tooltipSections={TOOLTIP_DATA.flexuralYield}
             traceSteps={dg1.trivial ? [
               { eq: "T_u = 0 → no tension demand",
                 codeRef: "Skipped — no anchor tension",

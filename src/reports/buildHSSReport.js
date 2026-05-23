@@ -14,7 +14,7 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
     plateT, plateGrade,
     branchTransverseDim, selectedFaceDim,
     loadCase, angleDeg, legSize, fexx,
-    pFace, useDirectional, overrideLength, customLength,
+    appliedLoad, pFace, useDirectional, overrideLength, customLength,
   } = state;
   const {
     weld, base, size, governing, faceLen, k5, loa,
@@ -74,6 +74,8 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
     {
       group: "Applied loads",
       rows: [
+        { label: "Total branch load, P_total", value: appliedLoad > 0 ? `${appliedLoad.toFixed(2)} kips` : "0 (no demand)" },
+        { label: "Face share factor", value: `${(selectedFaceNominal / (2 * (branch.B + branch.H)) * 100).toFixed(1)}%` },
         { label: "Demand on face, P_face", value: pFace > 0 ? `${pFace.toFixed(2)} kips` : "0 (no demand)" },
       ],
     },
@@ -118,7 +120,10 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
   }
 
   if (weld && faceLen) {
+    const faceSymbol = selectedFaceDim === "B" ? "B_b" : "H_b";
     const steps = [
+      { eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
+        codeRef: "Weld force perimeter distribution", value: `${pFace.toFixed(2)} kips` },
       { eq: "te = 0.707·w", codeRef: "AISC 360-16 §J2.2a", value: `${weld.te.toFixed(4)} in` },
       { eq: `Awe = te·L_eff = ${weld.te.toFixed(4)}·${faceLen.length.toFixed(3)}`,
         codeRef: "AISC 360-16 §J2.4 effective area", value: `${weld.Awe.toFixed(3)} in²` },
@@ -153,10 +158,13 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
   }
 
   if (base && faceLen) {
+    const faceSymbol = selectedFaceDim === "B" ? "B_b" : "H_b";
     checks.push({
       title: `Check 2 — Base metal shear (${baseLabel})`,
       codeRef: "AISC 360-16 §J4.2",
       steps: [
+        { eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
+          codeRef: "Weld force perimeter distribution", value: `${pFace.toFixed(2)} kips` },
         { eq: `A = t·L_eff = ${baseT.toFixed(4)}·${faceLen.length.toFixed(3)}`,
           codeRef: "AISC 360-16 base shear critical area", value: `${base.A.toFixed(3)} in²` },
         { eq: `Yielding: Rn = 0.60·Fy·A = 0.60·${baseFy}·${base.A.toFixed(3)}`,

@@ -53,7 +53,7 @@ export function CheckBox({ status, demand, cap, dcr, label }) {
 /**
  * Renders a full validation card grouping math trace steps, metrics, and checking status
  */
-export function CheckBlock({ title, codeRef, traceSteps, statCards, checkProps }) {
+export function CheckBlock({ title, codeRef, traceSteps, statCards, checkProps, tooltipSections }) {
   const [isOpen, setIsOpen] = useState(true);
   return (
     <div className="card check-block-card">
@@ -66,10 +66,23 @@ export function CheckBlock({ title, codeRef, traceSteps, statCards, checkProps }
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setIsOpen(!isOpen); e.preventDefault(); } }}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          <span className="header-title">{title}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span className="header-title">{title}</span>
+          </div>
           <span className="header-ref">{codeRef}</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <div
+          style={{ display: "flex", alignItems: "center", gap: "8px" }}
+          onClick={(e) => {
+            // If the click happened on the info icon or tooltip, do not collapse the card
+            if (e.target.closest(".info-tooltip-wrapper")) {
+              e.stopPropagation();
+            }
+          }}
+        >
+          {tooltipSections && (
+            <InfoTooltip title={`${title} — Details`} sections={tooltipSections} align="right" />
+          )}
           {checkProps && checkProps.status && (
             <span className={`status-badge-mini ${checkProps.status === "OK" ? "pass" : "fail"}`}>
               {checkProps.status}
@@ -146,6 +159,85 @@ export function WarningBanner({ title, items }) {
           <li key={i}>{it}</li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/**
+ * SOLID-compliant interactive tooltip with try-catch-finally block error resilience
+ */
+export function InfoTooltip({ title, sections, align = "right" }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleMouseEnter = () => {
+    try {
+      setIsOpen(true);
+    } catch (err) {
+      console.error("Failed to show tooltip on hover", err);
+    } finally {
+      // Safe execution
+    }
+  };
+
+  const handleMouseLeave = () => {
+    try {
+      setIsOpen(false);
+    } catch (err) {
+      console.error("Failed to hide tooltip on mouse leave", err);
+    } finally {
+      // Safe execution
+    }
+  };
+
+  const getBoxStyle = () => {
+    try {
+      switch (align) {
+        case "left":
+          return { left: 0, right: "auto" };
+        case "center":
+          return { left: "-133px", right: "auto" };
+        case "right":
+        default:
+          return { right: 0, left: "auto" };
+      }
+    } catch (err) {
+      console.error("Failed to compute box style", err);
+      return { right: 0, left: "auto" };
+    }
+  };
+
+  return (
+    <div
+      className="info-tooltip-wrapper"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        className="info-btn"
+        title="Hover for engineering assumptions and references"
+        onClick={(e) => e.stopPropagation()}
+      >
+        i
+      </button>
+      {isOpen && (
+        <div className="info-tooltip-box" style={getBoxStyle()}>
+          <div className="info-tooltip-header">
+            <span className="info-tooltip-title">{title}</span>
+          </div>
+          <div className="info-tooltip-content">
+            {sections && sections.map((sec, i) => (
+              <div key={i} className="info-tooltip-section">
+                {sec.label && (
+                  <span className="info-tooltip-sec-title">{sec.label}</span>
+                )}
+                <p className="info-tooltip-text">{sec.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

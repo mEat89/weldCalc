@@ -555,7 +555,7 @@ input[type=number] {
 
 .check-block-content {
   display: grid;
-  grid-template-columns: 3fr 2fr;
+  grid-template-columns: 3.4fr 1.6fr;
   gap: 0;
   min-height: auto;
 }
@@ -618,9 +618,9 @@ input[type=number] {
 
 .trace-eq {
   font-family: 'Consolas', 'Courier New', monospace;
-  font-size: 12px;
+  font-size: 10px;
   color: var(--text-main);
-  word-break: break-all;
+  white-space: nowrap;
   order: 1;
   flex-shrink: 0;
 }
@@ -628,8 +628,9 @@ input[type=number] {
 .trace-val {
   font-family: 'Consolas', 'Courier New', monospace;
   font-weight: 700;
-  font-size: 12.5px;
+  font-size: 10.5px;
   color: var(--text-main);
+  white-space: nowrap;
   order: 3;
   flex-shrink: 0;
 }
@@ -1233,13 +1234,13 @@ input[type=number] {
   background-color: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: var(--radius-md);
-  padding: 16px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   box-shadow: var(--shadow-sm);
-  min-height: 220px;
+  min-height: 180px;
   position: relative;
   overflow: hidden;
 }
@@ -1249,7 +1250,7 @@ input[type=number] {
   font-weight: 700;
   text-transform: uppercase;
   color: var(--text-muted);
-  margin-bottom: 12px;
+  margin-bottom: 6px;
   align-self: flex-start;
 }
 
@@ -1484,6 +1485,135 @@ input[type=number] {
 .dropdown-item:hover {
   background-color: var(--primary-light) !important;
   color: var(--primary) !important;
+}
+
+/* Reusable Information Tooltips with SOLID design */
+.info-tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.info-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  font-size: 10px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease-in-out;
+  user-select: none;
+}
+
+.info-btn:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background-color: var(--primary-light);
+}
+
+.info-tooltip-box {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  width: 290px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fadeInWobble 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
+  white-space: normal; /* Override single-line white-space constraint! */
+}
+
+/* Invisible bridge pseudo-element to prevent flicker when cursor crosses the 8px margin gap */
+.info-tooltip-box::before {
+  content: "";
+  position: absolute;
+  top: -12px;
+  left: -20px;
+  right: -20px;
+  height: 12px;
+  background-color: transparent;
+}
+
+@keyframes fadeInWobble {
+  from { opacity: 0; transform: translateY(-4px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.info-tooltip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 4px;
+}
+
+.info-tooltip-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+
+.info-tooltip-close {
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.info-tooltip-close:hover {
+  color: var(--danger);
+}
+
+.info-tooltip-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.info-tooltip-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.info-tooltip-sec-title {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+.info-tooltip-text {
+  font-size: 10px;
+  color: var(--text-main);
+  line-height: 1.35;
+  margin: 0;
 }
 
 

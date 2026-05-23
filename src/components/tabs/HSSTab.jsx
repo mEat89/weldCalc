@@ -19,10 +19,37 @@ import {
   to16ths,
 } from "../../math/weldMath";
 import { Field, PlateThicknessSelect, HssMemberSelect, SteelGradeSelect } from "../shared/FormElements";
-import { CheckBlock, WarningBanner } from "../shared/CheckResults";
+import { CheckBlock, WarningBanner, InfoTooltip } from "../shared/CheckResults";
 import HssSvgDiagram from "../shared/HssSvgDiagram";
 import ReportActions from "../shared/ReportActions";
 import { buildHSSReport } from "../../reports/buildHSSReport";
+
+const TOOLTIP_DATA = {
+  aiscMode: [
+    { text: "Assumes the weld line is fully effective along its entire physical length. It considers the effective length equal to the nominal face dimension (Bb or Hb), assuming infinite chord wall stiffness and rigid plate behavior without local shear lag or out-of-plane flexing." },
+    { label: "AISC Reference", text: "AISC 360 Section J2.4." }
+  ],
+  k5Mode: [
+    { text: "Applies the Chapter K effective width reduction to account for out-of-plane flexing of the chord face. The effective length is reduced to Be (from Eq. K1-1) for transverse weld lines because stress concentrates near the stiff vertical HSS sidewalls while the flexible face center transfers negligible load." },
+    { label: "AISC Reference", text: "AISC 360 Section K5 & Table K5.1 (Eq. K1-1)." }
+  ],
+  effLength: [
+    { text: "Determines the design effective length of the weld line being checked by applying either the fully effective nominal length or the K5 Be chord-flexibility reduction. This accounts for stress distribution variations between stiff sidewalls and flexible transverse faces." },
+    { label: "AISC Reference", text: "AISC 360 Table K5.1." }
+  ],
+  weldMetal: [
+    { text: "Checks shear rupture of the fillet weld throat under acting load. The design strength is calculated as φRn = φ·Fnw·Awe, where Awe = 0.707·w·Leff and Fnw = 0.6·FEXX. Fillet weld shear stress is assumed uniform over the throat area, and the directional strength factor is suppressed for HSS branch welds per Chapter K commentary." },
+    { label: "AISC Reference", text: "AISC 360 Section J2.4." }
+  ],
+  baseMetal: [
+    { text: "Verifies the connected thinner base material does not fail in shear yielding or rupture. The design strength is governed by the minimum of yielding capacity (φRn = 1.0·0.6·Fy·t·Leff) and rupture capacity (φRn = 0.75·0.6·Fu·t·Leff), assuming a uniform shear stress distribution through the material thickness." },
+    { label: "AISC Reference", text: "AISC 360 Section J4.2." }
+  ],
+  weldSize: [
+    { text: "Ensures the selected fillet weld leg size is within code limits to guarantee joint structural integrity. The leg size is checked against minimum size requirements (based on thicker parts to prevent rapid cooling cracks) and maximum size limits (based on thinner parts to prevent weld throat wash-away)." },
+    { label: "AISC Reference", text: "AISC 360 Section J2.2b & Table J2.4." }
+  ]
+};
 
 export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, setRefsOpen, darkMode, toggleDarkMode, reportMeta, setReportMeta }) {
   const diagramRef = useRef(null);
@@ -51,7 +78,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
   const [angleDeg, setAngleDeg] = useState(90);
   const [legSize, setLegSize] = useState(0.25);
   const [fexx, setFexx] = useState(70);
-  const [pFace, setPFace] = useState(0);
+  const [appliedLoad, setAppliedLoad] = useState(0);
   const [useDirectional, setUseDirectional] = useState(false);
   const [overrideLength, setOverrideLength] = useState(false);
   const [customLength, setCustomLength] = useState(0);
@@ -69,6 +96,9 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
   const transverseLen = branchTransverseDim === "B" ? branch.B : branch.H;
   const parallelLen   = branchTransverseDim === "B" ? branch.H : branch.B;
   const selectedFaceNominal = selectedFaceDim === "B" ? branch.B : branch.H;
+
+  const pFace = appliedLoad * (selectedFaceNominal / (2 * (branch.B + branch.H)));
+  const faceSymbol = selectedFaceDim === "B" ? "B_b" : "H_b";
 
   const thetaDeg = loadCase === "long" ? 0 : loadCase === "trans" ? 90 : angleDeg;
 
@@ -88,11 +118,11 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
     try {
       k5 = calcK5EffectiveWidth({
         chordB: selectedFaceNominal,
-        chordT: plateT,
-        chordFy: plateGrade.fy,
+        chordT: branch.tDes,
+        chordFy: branchGrade.fy,
         branchB: selectedFaceNominal,
-        branchT: branch.tDes,
-        branchFy: branchGrade.fy,
+        branchT: plateT,
+        branchFy: plateGrade.fy,
       });
     } catch (e) { k5Error = e instanceof Error ? e.message : String(e); }
   }
@@ -203,13 +233,13 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
     let traceSteps = [];
     let codeRef = "";
     if (lengthMode === "k5" && connType === "hss2plate") {
-      codeRef = "AISC 360 §K5 Eq. K1-1 (engineering judgment — plate as chord)";
+      codeRef = "AISC 360 §K5 Eq. K1-1 — plate-to-HSS connection";
       if (k5) {
         traceSteps = [
-          { eq: `Chord B (HSS face dim) = ${selectedFaceNominal}"`, codeRef: "HSS face dimension used as plate chord proxy", value: `${selectedFaceNominal} in` },
-          { eq: `B/t (plate) = ${selectedFaceNominal} / ${plateT.toFixed(4)} = ${k5.Bt.toFixed(2)}`, codeRef: "Plate slenderness ratio (face dim / plate thickness)", value: k5.Bt.toFixed(2) },
-          { eq: `Be_raw = (10/(B/t))·(Fyp·tp / (Fyb·tb))·Bb`, codeRef: "K5 Eq. K1-1 applied to plate-as-chord", value: `${k5.beRaw.toFixed(3)} in` },
-          { eq: `     = (10/${k5.Bt.toFixed(2)})·(${plateGrade.fy}·${plateT.toFixed(4)} / (${branchGrade.fy}·${branch.tDes.toFixed(4)}))·${selectedFaceNominal}`, codeRef: "Substituted metrics", value: `${k5.beRaw.toFixed(3)} in` },
+          { eq: `Chord B (HSS face) = ${selectedFaceNominal}"`, codeRef: "HSS face dimension acting as chord face", value: `${selectedFaceNominal} in` },
+          { eq: `B/t (HSS chord) = ${selectedFaceNominal} / ${branch.tDes.toFixed(4)} = ${k5.Bt.toFixed(2)}`, codeRef: "HSS chord slenderness ratio (face width / HSS thickness)", value: k5.Bt.toFixed(2) },
+          { eq: `Be_raw = (10/(B/t))·(Fy·t / (Fyp·tp))·Bb`, codeRef: "AISC 360 §K5 Eq. K1-1", value: `${k5.beRaw.toFixed(3)} in` },
+          { eq: `     = (10/${k5.Bt.toFixed(2)})·(${branchGrade.fy}·${branch.tDes.toFixed(4)} / (${plateGrade.fy}·${plateT.toFixed(4)}))·${selectedFaceNominal}`, codeRef: "Substituted metrics", value: `${k5.beRaw.toFixed(3)} in` },
           { eq: `Be = min(Be_raw, Bb) = min(${k5.beRaw.toFixed(3)}, ${selectedFaceNominal})`, codeRef: k5.capped ? "Capped at Bb" : "Be < Bb — reduction governs", value: `${k5.be.toFixed(3)} in` },
           { eq: `L_eff (this face) = Be`, codeRef: "K5 reduction width applied to selected face", value: `${k5.be.toFixed(3)} in` },
         ];
@@ -284,7 +314,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                   plateT, plateGrade,
                   branchTransverseDim, selectedFaceDim,
                   loadCase, angleDeg, legSize, fexx,
-                  pFace, useDirectional, overrideLength, customLength,
+                  appliedLoad, pFace, useDirectional, overrideLength, customLength,
                 },
                 calcs: {
                   weld, base, size, governing, faceLen, k5, loa,
@@ -418,15 +448,45 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
           <div className="toggle-btn-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
             {activeLengthMethods.map((m) => {
               const active = lengthMode === m.id;
+              const tooltipSecs = m.id === "k5" ? TOOLTIP_DATA.k5Mode : TOOLTIP_DATA.aiscMode;
               return (
                 <button
                   key={m.id}
                   onClick={() => setLengthMode(m.id)}
                   className={`toggle-option-btn compact ${active ? "active" : ""}`}
                   type="button"
-                  style={{ padding: "6px", fontSize: "11px" }}
+                  style={{
+                    padding: "6px 24px 6px 6px",
+                    fontSize: "11px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    position: "relative",
+                    width: "100%",
+                  }}
                 >
-                  <div className="btn-main-label" style={{ fontSize: "11px", fontWeight: "700" }}>{m.short}</div>
+                  <span className="btn-main-label" style={{ fontSize: "11px", fontWeight: "700" }}>{m.short}</span>
+                  <div
+                    className="info-tooltip-container"
+                    style={{
+                      position: "absolute",
+                      right: "6px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                    onClick={(e) => {
+                      // Prevent parent button action from triggering when clicking the tooltip!
+                      e.stopPropagation();
+                    }}
+                  >
+                    <InfoTooltip
+                      title={`${m.short} — Method Details`}
+                      sections={tooltipSecs}
+                      align={m.id === "k5" ? "right" : "center"}
+                    />
+                  </div>
                 </button>
               );
             })}
@@ -536,15 +596,15 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                       onClick={() => setSelectedFaceDim(f.id)}
                       className={`toggle-option-btn compact ${active ? "active" : ""}`}
                       type="button"
-                      style={{ padding: "6px 8px", fontSize: "10px", borderRadius: "var(--radius-sm)", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}
+                      style={{ padding: "5px 8px", fontSize: "10px", borderRadius: "var(--radius-sm)", display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "6px" }}
                     >
-                      <div className="btn-main-label" style={{ fontSize: "10px", fontWeight: "700" }}>Face {f.id} ({lengthStr})</div>
-                      <div className="btn-sub-label" style={{ fontSize: "9px", marginTop: "2px" }}>{subLabel}</div>
+                      <span style={{ fontWeight: "700" }}>Face {f.id} ({lengthStr})</span>
+                      <span style={{ opacity: 0.85, fontSize: "9.5px" }}>— {subLabel}</span>
                     </button>
                   );
                 })}
               </div>
-              <div style={{ fontSize: "10.5px", color: "var(--text-muted)", marginTop: "4px", lineHeight: "1.25", fontStyle: "italic", paddingLeft: "6px" }}>
+              <div style={{ fontSize: "9.5px", color: "var(--text-muted)", marginTop: "3px", lineHeight: "1.2", fontStyle: "italic", paddingLeft: "6px" }}>
                 ℹ️ The calculator analyzes a single weld line at a time. The effective length (Leff) and capacities are unitary and are not multiplied by 2.
               </div>
             </div>
@@ -658,8 +718,8 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                 type="number"
                 min="0"
                 step="0.5"
-                value={pFace}
-                onChange={(e) => setPFace(parseFloat(e.target.value) || 0)}
+                value={appliedLoad}
+                onChange={(e) => setAppliedLoad(parseFloat(e.target.value) || 0)}
                 className="form-input"
                 style={{ fontSize: "13.5px", fontWeight: "700", padding: "6px 10px", borderColor: "var(--primary)", backgroundColor: "var(--primary-light)" }}
               />
@@ -692,6 +752,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
               traceSteps={effLenBlockForReport.traceSteps}
               statCards={effLenBlockForReport.statCards}
               checkProps={null}
+              tooltipSections={TOOLTIP_DATA.effLength}
             />
           )}
 
@@ -700,7 +761,10 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
           <CheckBlock
             title="Check 1: Weld metal shear rupture"
             codeRef="AISC 360-16 §J2.4"
+            tooltipSections={TOOLTIP_DATA.weldMetal}
             traceSteps={[
+              { eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
+                codeRef: "Weld force perimeter distribution", value: `${pFace.toFixed(2)} kips` },
               { eq: "te = 0.707·w", codeRef: "AISC 360-16 §J2.2a", value: `${weld.te.toFixed(4)} in` },
               { eq: `Awe = te·L_eff = ${weld.te.toFixed(4)}·${faceLen.length.toFixed(3)}`,
                 codeRef: "AISC 360-16 §J2.4 effective area", value: `${weld.Awe.toFixed(3)} in²` },
@@ -730,7 +794,10 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
           <CheckBlock
             title={`Check 2: Base metal shear (${baseLabel})`}
             codeRef="AISC 360-16 §J4.2"
+            tooltipSections={TOOLTIP_DATA.baseMetal}
             traceSteps={[
+              { eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
+                codeRef: "Weld force perimeter distribution", value: `${pFace.toFixed(2)} kips` },
               { eq: `A = t·L_eff = ${baseT.toFixed(4)}·${faceLen.length.toFixed(3)}`,
                 codeRef: "AISC 360-16 base shear critical area", value: `${base.A.toFixed(3)} in²` },
               { eq: `Yielding: Rn = 0.60·Fy·A = 0.60·${baseFy}·${base.A.toFixed(3)}`,
@@ -761,6 +828,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
           <CheckBlock
             title="Check 3: Weld size limits"
             codeRef="AISC 360-16 §J2.2b, Table J2.4"
+            tooltipSections={TOOLTIP_DATA.weldSize}
             traceSteps={[
               { eq: `Provided: w = ${toFraction(legSize)}`, codeRef: "User selected leg size", value: to16ths(legSize) },
               { eq: `Min for t = ${toFraction(baseT)}: w_min = ${size.minLabel}`,

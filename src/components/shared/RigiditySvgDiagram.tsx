@@ -10,7 +10,7 @@ export default function RigiditySvgDiagram({ tp, Nplate, x, Tu }: RigiditySvgDia
   return (
     <div className="svg-diagram-container">
       <div className="svg-diagram-title">Interactive Base Plate Bending & Anchor Tension</div>
-      <svg className="technical-drawing" width="360" height="200" viewBox="0 0 400 200">
+      <svg className="technical-drawing" width="360" height="150" viewBox="0 15 400 170">
         {/* Concrete background block */}
         <rect x="20" y="140" width="360" height="50" fill="#f8fafc" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 2" rx="2" />
         <text x="370" y="180" textAnchor="end" className="drawing-dim-text" style={{ fill: "#64748b", fontSize: "9px" }}>Concrete Foundation</text>
