@@ -1,11 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { STEEL_GRADES, LEG_SIZES, FEXX_OPTIONS, SHAPE_PRESETS, LOAD_CASES } from "../../constants/steelData";
 import { calcWeldMetal, calcBaseMetal, calcWeldSize, toFraction, to16ths } from "../../math/weldMath";
 import { Field, PlateThicknessSelect } from "../shared/FormElements";
 import { CheckBlock } from "../shared/CheckResults";
 import ShapesSvgDiagram from "../shared/ShapesSvgDiagram";
+import ReportActions from "../shared/ReportActions";
+import { buildStandardShapesReport } from "../../reports/buildStandardShapesReport";
 
-export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLegendOpen, setRefsOpen, darkMode, toggleDarkMode }) {
+export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLegendOpen, setRefsOpen, darkMode, toggleDarkMode, reportMeta, setReportMeta }) {
+  const diagramRef = useRef(null);
   const [shapeIdx, setShapeIdx] = useState(0);
   const [loadCase, setLoadCase] = useState("long");
   const [legSize, setLegSize] = useState(0.25);
@@ -72,12 +75,12 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
             AISC 360-16 — Standard shapes weldments
           </div>
           
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr 0.6fr", gap: "6px", width: "100%", alignItems: "center" }} className="mt-1">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.1fr 0.6fr", gap: "6px", width: "100%", alignItems: "center" }} className="mt-1">
             <button
               onClick={() => setLegendOpen(true)}
               className="btn-legend-trigger"
               type="button"
-              style={{ padding: "4px 6px", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", height: "26px" }}
+              style={{ padding: "4px 4px", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", height: "26px" }}
             >
               📖 Legend
             </button>
@@ -85,16 +88,34 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
               onClick={() => setRefsOpen(true)}
               className="btn-legend-trigger"
               type="button"
-              style={{ padding: "4px 6px", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", height: "26px" }}
+              style={{ padding: "4px 4px", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", height: "26px" }}
             >
-              📚 References
+              📚 Refs
             </button>
+            <ReportActions
+              reportMeta={reportMeta}
+              setReportMeta={setReportMeta}
+              diagramRef={diagramRef}
+              buildModel={(meta, diagramSvgString) => buildStandardShapesReport({
+                state: {
+                  shape, loadCase, legSize, length, nLines, angleDeg, fexx, appliedLoad,
+                  useDirectional, memberT, memberGrade, plateT, plateGrade,
+                },
+                calcs: {
+                  weld, base, size, governing,
+                  fnwEq, fnwRef, designEq, designRef,
+                  baseLabel, baseT, baseFy, baseFu, thetaDeg,
+                },
+                meta,
+                diagramSvgString,
+              })}
+            />
             <button
               onClick={toggleDarkMode}
               className="btn-legend-trigger theme-toggle-btn"
               type="button"
               title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              style={{ padding: "4px 6px", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "26px" }}
+              style={{ padding: "4px 4px", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "26px" }}
             >
               {darkMode ? "☀️" : "🌙"}
             </button>
@@ -183,10 +204,13 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
 
       {/* 2. Right Main Panel */}
       <main className="app-main-content">
+
         {/* TOP 3-COLUMN CONTROL PANEL GRID */}
         <div className="top-controls-grid">
           {/* Column 1: Interactive SVG Diagram */}
-          <ShapesSvgDiagram shape={shape} loadCase={loadCase} angleDeg={angleDeg} />
+          <div ref={diagramRef} style={{ display: "contents" }}>
+            <ShapesSvgDiagram shape={shape} loadCase={loadCase} angleDeg={angleDeg} />
+          </div>
 
           {/* Column 2: Load case / direction */}
           <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>

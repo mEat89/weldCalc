@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   HSS_SHAPES,
   STEEL_GRADES,
@@ -21,8 +21,11 @@ import {
 import { Field, PlateThicknessSelect } from "../shared/FormElements";
 import { CheckBlock, WarningBanner } from "../shared/CheckResults";
 import HssSvgDiagram from "../shared/HssSvgDiagram";
+import ReportActions from "../shared/ReportActions";
+import { buildHSSReport } from "../../reports/buildHSSReport";
 
-export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, setRefsOpen, darkMode, toggleDarkMode }) {
+export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, setRefsOpen, darkMode, toggleDarkMode, reportMeta, setReportMeta }) {
+  const diagramRef = useRef(null);
   // Connection sub-type
   const [connType, setConnType] = useState("hss2hss"); // hss2plate | hss2hss
 
@@ -198,6 +201,61 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
 
   const activeLengthMethods = LENGTH_METHODS.filter((m) => m.id !== "cbfem");
 
+  // Build the effective-length CheckBlock data once so it can be shown in the
+  // UI AND included in the exported report without duplicating the logic.
+  let effLenBlockForReport = null;
+  if (faceLen) {
+    let traceSteps = [];
+    let codeRef = "";
+    if (lengthMode === "k5" && connType === "hss2plate") {
+      codeRef = "AISC 360 §K5 Eq. K1-1 (engineering judgment — plate as chord)";
+      if (isTransverseFace && k5) {
+        traceSteps = [
+          { eq: `Chord B (HSS face dim) = ${selectedFaceNominal}"`, codeRef: "HSS face dimension used as plate chord proxy", value: `${selectedFaceNominal} in` },
+          { eq: `B/t (plate) = ${selectedFaceNominal} / ${plateT.toFixed(4)} = ${k5.Bt.toFixed(2)}`, codeRef: "Plate slenderness ratio (face dim / plate thickness)", value: k5.Bt.toFixed(2) },
+          { eq: `Be_raw = (10/(B/t))·(Fyp·tp / (Fyb·tb))·Bb`, codeRef: "K5 Eq. K1-1 applied to plate-as-chord", value: `${k5.beRaw.toFixed(3)} in` },
+          { eq: `     = (10/${k5.Bt.toFixed(2)})·(${plateGrade.fy}·${plateT.toFixed(4)} / (${branchGrade.fy}·${branch.tDes.toFixed(4)}))·${selectedFaceNominal}`, codeRef: "Substituted metrics", value: `${k5.beRaw.toFixed(3)} in` },
+          { eq: `Be = min(Be_raw, Bb) = min(${k5.beRaw.toFixed(3)}, ${selectedFaceNominal})`, codeRef: k5.capped ? "Capped at Bb" : "Be < Bb — reduction governs", value: `${k5.be.toFixed(3)} in` },
+          { eq: `L_eff (this face) = Be`, codeRef: "K5 reduction width applied to selected face", value: `${k5.be.toFixed(3)} in` },
+        ];
+      } else {
+        traceSteps = [
+          { eq: `Face is parallel to bending axis`, codeRef: "K5 mode: K5 applies only to transverse welds", value: "—" },
+          { eq: `L_eff (this face) = ${selectedFaceNominal}" (nominal)`, codeRef: "Longitudinal welds fully effective", value: `${selectedFaceNominal} in` },
+        ];
+      }
+    } else if (connType === "hss2hss" && k5) {
+      codeRef = "AISC 360 §K5 Eq. K1-1, Table K5.1";
+      traceSteps = isTransverseFace ? [
+        { eq: `β = Bb / B = ${transverseLen} / ${chord.B} = ${k5.beta.toFixed(3)}`, codeRef: "Width ratio checking (§K1)", value: k5.beta > 1.0 ? "β > 1 — invalid" : "OK" },
+        { eq: `B/t = ${chord.B} / ${chord.tDes.toFixed(4)} = ${k5.Bt.toFixed(2)}`, codeRef: "Chord member wall slenderness", value: k5.Bt.toFixed(2) },
+        { eq: `Be_raw = (10/(B/t))·(Fy·t / (Fyb·tb))·Bb`, codeRef: "AISC 360 §K5 Eq. K1-1", value: `${k5.beRaw.toFixed(3)} in` },
+        { eq: `     = (10/${k5.Bt.toFixed(2)})·(${chordGrade.fy}·${chord.tDes.toFixed(4)} / (${branchGrade.fy}·${branch.tDes.toFixed(4)}))·${transverseLen}`, codeRef: "Substituted properties", value: `${k5.beRaw.toFixed(3)} in` },
+        { eq: `Be = min(Be_raw, Bb) = min(${k5.beRaw.toFixed(3)}, ${transverseLen})`, codeRef: k5.capped ? "Capped at Bb (§K5 limit)" : "Be < Bb — reduction governs", value: `${k5.be.toFixed(3)} in` },
+        { eq: `L_eff (this face) = Be`, codeRef: "Transverse face weld effective length", value: `${k5.be.toFixed(3)} in` },
+      ] : [
+        { eq: `Selected face is PARALLEL to chord axis`, codeRef: "AISC 360 §K5 Table K5.1", value: "—" },
+        { eq: `L_eff (this face) = ${parallelLen}" (nominal)`, codeRef: "Longitudinal weld lines fully effective", value: `${parallelLen} in` },
+      ];
+    } else {
+      codeRef = "AISC 360-22 §J2.4 — full nominal length";
+      traceSteps = [
+        { eq: `Selected face dimension = ${selectedFaceDim} = ${selectedFaceNominal}"`, codeRef: "From catalog dimensions", value: `${selectedFaceNominal} in` },
+        { eq: `L_eff = ${faceLen.length.toFixed(3)}" (full nominal)`, codeRef: "Rigid plate supports uniform stress", value: `${faceLen.length.toFixed(3)} in` },
+      ];
+    }
+    effLenBlockForReport = {
+      title: `Effective length [${LENGTH_METHODS.find((m) => m.id === lengthMode)?.short}]`,
+      codeRef,
+      traceSteps,
+      statCards: [
+        { label: "Mode", value: LENGTH_METHODS.find((m) => m.id === lengthMode)?.short ?? "" },
+        { label: "Nominal", value: `${selectedFaceNominal} in` },
+        { label: "L_eff", value: `${faceLen.length.toFixed(3)} in` },
+      ],
+    };
+  }
+
   return (
     <div className="app-layout">
       {/* 1. Left Sidebar menu Panel (Extremely Compact) */}
@@ -211,12 +269,12 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
             AISC 360-22 / 360-16 + DG1 — Rect HSS welds
           </div>
           
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr 0.6fr", gap: "6px", width: "100%", alignItems: "center" }} className="mt-1">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.1fr 0.6fr", gap: "6px", width: "100%", alignItems: "center" }} className="mt-1">
             <button
               onClick={() => setLegendOpen(true)}
               className="btn-legend-trigger"
               type="button"
-              style={{ padding: "4px 6px", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", height: "26px" }}
+              style={{ padding: "4px 4px", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", height: "26px" }}
             >
               📖 Legend
             </button>
@@ -224,16 +282,41 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
               onClick={() => setRefsOpen(true)}
               className="btn-legend-trigger"
               type="button"
-              style={{ padding: "4px 6px", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", height: "26px" }}
+              style={{ padding: "4px 4px", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", height: "26px" }}
             >
-              📚 References
+              📚 Refs
             </button>
+            <ReportActions
+              reportMeta={reportMeta}
+              setReportMeta={setReportMeta}
+              diagramRef={diagramRef}
+              buildModel={(meta, diagramSvgString) => buildHSSReport({
+                state: {
+                  connType, lengthMode,
+                  branch, branchGrade, chord, chordGrade,
+                  plateT, plateGrade,
+                  branchTransverseDim, selectedFaceDim,
+                  loadCase, angleDeg, legSize, fexx,
+                  pFace, useDirectional, overrideLength, customLength,
+                },
+                calcs: {
+                  weld, base, size, governing, faceLen, k5, loa,
+                  effLenBlock: effLenBlockForReport,
+                  fnwEq, fnwRef, designEq, designRef,
+                  baseT, baseFy, baseFu, baseLabel,
+                  thetaDeg, effectiveUseDirectional, lockDirectional, lockReason,
+                  selectedFaceNominal, faceDescription,
+                },
+                meta,
+                diagramSvgString,
+              })}
+            />
             <button
               onClick={toggleDarkMode}
               className="btn-legend-trigger theme-toggle-btn"
               type="button"
               title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              style={{ padding: "4px 6px", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "26px" }}
+              style={{ padding: "4px 4px", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "26px" }}
             >
               {darkMode ? "☀️" : "🌙"}
             </button>
@@ -479,15 +562,18 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
 
       {/* 2. Right Main Panel */}
       <main className="app-main-content">
+
         {/* TOP 2-COLUMN CONTROL PANEL GRID (Compacted) */}
         <div className="top-controls-grid hss-top-grid">
           {/* Column 1: Interactive SVG Diagram (Standalone Card, matches other tabs) */}
-          <HssSvgDiagram
-            selectedFaceDim={selectedFaceDim}
-            branch={branch}
-            loadCase={loadCase}
-            angleDeg={angleDeg}
-          />
+          <div ref={diagramRef} style={{ display: "contents" }}>
+            <HssSvgDiagram
+              selectedFaceDim={selectedFaceDim}
+              branch={branch}
+              loadCase={loadCase}
+              angleDeg={angleDeg}
+            />
+          </div>
           
           {/* Column 2: Weld Face Selection & Branch Orientation (Standalone Card) */}
           <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", gap: "10px", justifyContent: "center" }}>
@@ -638,97 +724,15 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
         {/* Checks grid (2 columns side-by-side) */}
         <div className="checks-grid">
           {/* Effective Length Trace (Collapsible) */}
-          {faceLen && (() => {
-          let traceSteps = [];
-          let codeRef = "";
-
-          if (lengthMode === "k5" && connType === "hss2plate") {
-            codeRef = "AISC 360 §K5 Eq. K1-1 (engineering judgment — plate as chord)";
-            if (isTransverseFace && k5) {
-              traceSteps = [
-                { eq: `Chord B (HSS face dim) = ${selectedFaceNominal}"`,
-                  codeRef: "HSS face dimension used as plate chord proxy",
-                  value: `${selectedFaceNominal} in` },
-                { eq: `B/t (plate) = ${selectedFaceNominal} / ${plateT.toFixed(4)} = ${k5.Bt.toFixed(2)}`,
-                  codeRef: "Plate slenderness ratio (face dim / plate thickness)",
-                  value: k5.Bt.toFixed(2) },
-                { eq: `Be_raw = (10/(B/t))·(Fyp·tp / (Fyb·tb))·Bb`,
-                  codeRef: "K5 Eq. K1-1 applied to plate-as-chord",
-                  value: `${k5.beRaw.toFixed(3)} in` },
-                { eq: `     = (10/${k5.Bt.toFixed(2)})·(${plateGrade.fy}·${plateT.toFixed(4)} / (${branchGrade.fy}·${branch.tDes.toFixed(4)}))·${selectedFaceNominal}`,
-                  codeRef: "Substituted metrics",
-                  value: `${k5.beRaw.toFixed(3)} in` },
-                { eq: `Be = min(Be_raw, Bb) = min(${k5.beRaw.toFixed(3)}, ${selectedFaceNominal})`,
-                  codeRef: k5.capped ? "Capped at Bb" : "Be < Bb — reduction governs",
-                  value: `${k5.be.toFixed(3)} in` },
-                { eq: `L_eff (this face) = Be`,
-                  codeRef: "K5 reduction width applied to selected face",
-                  value: `${k5.be.toFixed(3)} in` },
-              ];
-            } else {
-              traceSteps = [
-                { eq: `Face is parallel to bending axis`,
-                  codeRef: "K5 mode: K5 applies only to transverse welds",
-                  value: "—" },
-                { eq: `L_eff (this face) = ${selectedFaceNominal}" (nominal)`,
-                  codeRef: "Longitudinal welds fully effective",
-                  value: `${selectedFaceNominal} in` },
-              ];
-            }
-          } else if (connType === "hss2hss" && k5) {
-            codeRef = "AISC 360 §K5 Eq. K1-1, Table K5.1";
-            traceSteps = isTransverseFace ? [
-              { eq: `β = Bb / B = ${transverseLen} / ${chord.B} = ${k5.beta.toFixed(3)}`,
-                codeRef: "Width ratio checking (§K1)",
-                value: k5.beta > 1.0 ? "β > 1 — invalid" : "OK" },
-              { eq: `B/t = ${chord.B} / ${chord.tDes.toFixed(4)} = ${k5.Bt.toFixed(2)}`,
-                codeRef: "Chord member wall slenderness", value: k5.Bt.toFixed(2) },
-              { eq: `Be_raw = (10/(B/t))·(Fy·t / (Fyb·tb))·Bb`,
-                codeRef: "AISC 360 §K5 Eq. K1-1",
-                value: `${k5.beRaw.toFixed(3)} in` },
-              { eq: `     = (10/${k5.Bt.toFixed(2)})·(${chordGrade.fy}·${chord.tDes.toFixed(4)} / (${branchGrade.fy}·${branch.tDes.toFixed(4)}))·${transverseLen}`,
-                codeRef: "Substituted properties",
-                value: `${k5.beRaw.toFixed(3)} in` },
-              { eq: `Be = min(Be_raw, Bb) = min(${k5.beRaw.toFixed(3)}, ${transverseLen})`,
-                codeRef: k5.capped ? "Capped at Bb (§K5 limit)" : "Be < Bb — reduction governs",
-                value: `${k5.be.toFixed(3)} in` },
-              { eq: `L_eff (this face) = Be`,
-                codeRef: "Transverse face weld effective length",
-                value: `${k5.be.toFixed(3)} in` },
-            ] : [
-              { eq: `Selected face is PARALLEL to chord axis`,
-                codeRef: "AISC 360 §K5 Table K5.1",
-                value: "—" },
-              { eq: `L_eff (this face) = ${parallelLen}" (nominal)`,
-                codeRef: "Longitudinal weld lines fully effective",
-                value: `${parallelLen} in` },
-            ];
-          } else {
-            codeRef = "AISC 360-22 §J2.4 — full nominal length";
-            traceSteps = [
-              { eq: `Selected face dimension = ${selectedFaceDim} = ${selectedFaceNominal}"`,
-                codeRef: "From catalog dimensions",
-                value: `${selectedFaceNominal} in` },
-              { eq: `L_eff = ${faceLen.length.toFixed(3)}" (full nominal)`,
-                codeRef: "Rigid plate supports uniform stress",
-                value: `${faceLen.length.toFixed(3)} in` },
-            ];
-          }
-
-          return (
+          {effLenBlockForReport && (
             <CheckBlock
-              title={`Effective length [${LENGTH_METHODS.find((m) => m.id === lengthMode)?.short}]`}
-              codeRef={codeRef}
-              traceSteps={traceSteps}
-              statCards={[
-                { label: "Mode", value: LENGTH_METHODS.find((m) => m.id === lengthMode)?.short ?? "" },
-                { label: "Nominal", value: `${selectedFaceNominal} in` },
-                { label: "L_eff", value: `${faceLen.length.toFixed(3)} in` },
-              ]}
+              title={effLenBlockForReport.title}
+              codeRef={effLenBlockForReport.codeRef}
+              traceSteps={effLenBlockForReport.traceSteps}
+              statCards={effLenBlockForReport.statCards}
               checkProps={null}
             />
-          );
-        })()}
+          )}
 
         {/* Check 1: Weld metal (Collapsible) */}
         {weld && (

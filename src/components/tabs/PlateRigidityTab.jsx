@@ -1,12 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { HSS_SHAPES, STEEL_GRADES } from "../../constants/steelData";
 import { toFraction } from "../../math/weldMath";
 import { calcAnchorTensionAuto, calcMethodB, calcDG1, calcRigidityVerdict } from "../../math/plateMath";
 import { Field, InchInput, PlateThicknessSelect } from "../shared/FormElements";
 import { CheckBlock } from "../shared/CheckResults";
 import RigiditySvgDiagram from "../shared/RigiditySvgDiagram";
+import ReportActions from "../shared/ReportActions";
+import { buildRigidityReport } from "../../reports/buildRigidityReport";
 
-export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLegendOpen, setRefsOpen, darkMode, toggleDarkMode }) {
+export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLegendOpen, setRefsOpen, darkMode, toggleDarkMode, reportMeta, setReportMeta }) {
+  const diagramRef = useRef(null);
   // Column (HSS) state
   const [columnIdx, setColumnIdx] = useState(61); // HSS 12x8x5/8 default
   const [columnOrientation, setColumnOrientation] = useState("H_along_M"); // H_along_M or B_along_M
@@ -74,12 +77,12 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
             AISC DG1 — Base plate rigidity check
           </div>
           
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr 0.6fr", gap: "6px", width: "100%", alignItems: "center" }} className="mt-1">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.1fr 0.6fr", gap: "6px", width: "100%", alignItems: "center" }} className="mt-1">
             <button
               onClick={() => setLegendOpen(true)}
               className="btn-legend-trigger"
               type="button"
-              style={{ padding: "4px 6px", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", height: "26px" }}
+              style={{ padding: "4px 4px", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", height: "26px" }}
             >
               📖 Legend
             </button>
@@ -87,16 +90,33 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
               onClick={() => setRefsOpen(true)}
               className="btn-legend-trigger"
               type="button"
-              style={{ padding: "4px 6px", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", height: "26px" }}
+              style={{ padding: "4px 4px", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", height: "26px" }}
             >
-              📚 References
+              📚 Refs
             </button>
+            <ReportActions
+              reportMeta={reportMeta}
+              setReportMeta={setReportMeta}
+              diagramRef={diagramRef}
+              buildModel={(meta, diagramSvgString) => buildRigidityReport({
+                state: {
+                  column, columnOrientation,
+                  Nplate, Bplate, tp, plateGrade,
+                  Mu_ftkip, Pu, Vu,
+                  anchorOffsetY, beff, beffAuto,
+                  tuMode, tuManual,
+                },
+                calcs: { tAuto, mB, dg1, verdict, Mu, Tu, x, beffUsed, colDimAlongM },
+                meta,
+                diagramSvgString,
+              })}
+            />
             <button
               onClick={toggleDarkMode}
               className="btn-legend-trigger theme-toggle-btn"
               type="button"
               title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              style={{ padding: "4px 6px", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "26px" }}
+              style={{ padding: "4px 4px", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "26px" }}
             >
               {darkMode ? "☀️" : "🌙"}
             </button>
@@ -190,10 +210,13 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
 
       {/* 2. Right Main Panel */}
       <main className="app-main-content">
+
         {/* TOP 3-COLUMN CONTROL PANEL GRID */}
         <div className="top-controls-grid">
           {/* Column 1: Interactive SVG Diagram */}
-          <RigiditySvgDiagram tp={tp} Nplate={Nplate} column={column} x={x} Tu={Tu} />
+          <div ref={diagramRef} style={{ display: "contents" }}>
+            <RigiditySvgDiagram tp={tp} Nplate={Nplate} column={column} x={x} Tu={Tu} />
+          </div>
 
           {/* Column 2: Applied Loads & Anchor Tension Override */}
           <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>

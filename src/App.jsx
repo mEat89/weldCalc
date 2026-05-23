@@ -16,6 +16,13 @@ export default function App() {
   const [legendOpen, setLegendOpen] = useState(false);
   const [refsOpen, setRefsOpen] = useState(false);
 
+  // Session-persisted report metadata (project / engineer / job # / date).
+  // Lifted here so the modal pre-fills across tab switches.
+  const [reportMeta, setReportMeta] = useState({
+    project: "", engineer: "", jobNumber: "",
+    date: new Date().toISOString().slice(0, 10),
+  });
+
   // Global Dark Mode state
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem("weld_calc_dark_mode");
@@ -49,6 +56,8 @@ export default function App() {
           setRefsOpen={setRefsOpen}
           darkMode={darkMode}
           toggleDarkMode={toggleDarkMode}
+          reportMeta={reportMeta}
+          setReportMeta={setReportMeta}
         />
       </div>
 
@@ -61,6 +70,8 @@ export default function App() {
           setRefsOpen={setRefsOpen}
           darkMode={darkMode}
           toggleDarkMode={toggleDarkMode}
+          reportMeta={reportMeta}
+          setReportMeta={setReportMeta}
         />
       </div>
 
@@ -73,6 +84,8 @@ export default function App() {
           setRefsOpen={setRefsOpen}
           darkMode={darkMode}
           toggleDarkMode={toggleDarkMode}
+          reportMeta={reportMeta}
+          setReportMeta={setReportMeta}
         />
       </div>
 

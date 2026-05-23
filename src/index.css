@@ -112,21 +112,21 @@ body {
 .app-container {
   max-width: 1600px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 12px;
 }
 
 .app-layout {
   display: grid;
   grid-template-columns: 380px 1fr;
-  gap: 24px;
+  gap: 14px;
   align-items: start;
 }
 
 .checks-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-top: 16px;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 @media (max-width: 992px) {
@@ -170,7 +170,7 @@ body {
 .app-main-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
 }
 
 .version-badge {
@@ -235,7 +235,7 @@ body {
   background-color: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 16px;
+  padding: 12px;
   margin-bottom: 0px; /* layout handle gaps via grid */
   box-shadow: var(--shadow-sm);
   transition: var(--transition);
@@ -531,7 +531,7 @@ input[type=number] {
 
 .check-block-header {
   background: linear-gradient(90deg, var(--surface-subtle), var(--surface-muted));
-  padding: 8px 16px;
+  padding: 6px 12px;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
@@ -567,7 +567,7 @@ input[type=number] {
 }
 
 .trace-steps-container {
-  padding: 8px 14px;
+  padding: 6px 10px;
   border-right: 1px solid var(--border-color);
 }
 
@@ -579,17 +579,17 @@ input[type=number] {
 }
 
 .metrics-and-status-container {
-  padding: 8px 14px;
+  padding: 6px 10px;
   background-color: var(--surface-subtle);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* 8. Trace Steps & Stats */
 .trace-step {
-  padding: 4px 0;
+  padding: 2px 0;
   border-bottom: 1px solid var(--surface-muted);
 }
 
@@ -650,7 +650,7 @@ input[type=number] {
 .stat-card {
   background-color: var(--card-bg);
   border: 1px solid var(--border-color);
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-radius: var(--radius-sm);
   display: flex;
   justify-content: space-between;
@@ -677,7 +677,7 @@ input[type=number] {
   border-width: 2px;
   border-style: solid;
   border-radius: var(--radius-md);
-  padding: 6px 10px;
+  padding: 4px 8px;
   text-align: center;
   box-shadow: var(--shadow-sm);
   animation: pulse-border 2s infinite ease-in-out;
@@ -696,7 +696,7 @@ input[type=number] {
 }
 
 .check-box-status {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 900;
   line-height: 1.1;
   letter-spacing: 0.02em;
@@ -1480,5 +1480,11 @@ input[type=number] {
     grid-template-columns: 1fr;
   }
 }
+
+.dropdown-item:hover {
+  background-color: var(--primary-light) !important;
+  color: var(--primary) !important;
+}
+
 
 
