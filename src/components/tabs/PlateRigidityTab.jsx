@@ -183,10 +183,20 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
                   })}
                 </select>
               </Field>
-              <InchInput label="tp (thickness)" value={tp} onChange={setTp} min={0.25} step={0.0625} id="plate-tp" />
-            </div>
-            <div>
-              <PlateQuickPick value={tp} onChange={setTp} />
+              <Field label="tp (thickness)" id="plate-tp-select">
+                <select
+                  id="plate-tp-select"
+                  value={tp}
+                  onChange={(e) => setTp(parseFloat(e.target.value))}
+                  className="form-select compact"
+                >
+                  {COMMON_PLATE_T.map((t) => (
+                    <option key={t} value={t}>
+                      {toFraction(t)} ({t.toFixed(3)}")
+                    </option>
+                  ))}
+                </select>
+              </Field>
             </div>
           </div>
         </div>
@@ -351,8 +361,10 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
         {tAutoError && <div className="error-alert"><strong>Tension error:</strong> {tAutoError}</div>}
         {errors.length > 0 && errors.map((e, i) => <div key={i} className="error-alert">{e}</div>)}
 
-        {/* Check 1: Method B (elastic plate bending) (Collapsible) */}
-        {mB && (
+        {/* Checks grid (2 columns side-by-side) */}
+        <div className="checks-grid">
+          {/* Check 1: Method B (elastic plate bending) (Collapsible) */}
+          {mB && (
           <CheckBlock
             title="Check 1 — Method B: Elastic Plate Bending"
             codeRef="σmax = 6·Tu·x / (beff·t²) ≤ Fy"
@@ -427,6 +439,7 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
             }}
           />
         )}
+        </div>
 
         {/* Rigidity Verdict Panel */}
         {verdict && (

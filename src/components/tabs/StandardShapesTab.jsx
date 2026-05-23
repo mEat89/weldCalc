@@ -350,8 +350,10 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
           </div>
         )}
 
-        {/* Check 1: Weld Metal */}
-        {weld && (
+        {/* Checks grid (2 columns side-by-side) */}
+        <div className="checks-grid">
+          {/* Check 1: Weld Metal */}
+          {weld && (
           <CheckBlock
             title="Check 1: Weld metal shear rupture"
             codeRef="AISC 360-16 §J2.4"
@@ -431,6 +433,7 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
             }}
           />
         )}
+        </div>
 
         {/* Governing limit state */}
         {governing && governing.status && (

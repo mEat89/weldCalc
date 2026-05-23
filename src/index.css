@@ -109,7 +109,7 @@ body {
 
 /* 2. Layout & Page Containers */
 .app-container {
-  max-width: 1440px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 20px;
 }
@@ -119,6 +119,19 @@ body {
   grid-template-columns: 380px 1fr;
   gap: 24px;
   align-items: start;
+}
+
+.checks-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+@media (max-width: 992px) {
+  .checks-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 1024px) {
@@ -578,8 +591,18 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 8px;
+  gap: 4px;
   line-height: 1.25;
+  width: 100%;
+}
+
+.trace-row::after {
+  content: "";
+  flex-grow: 1;
+  border-bottom: 1px dotted var(--border-color);
+  margin: 0 8px;
+  order: 2;
+  min-width: 12px;
 }
 
 .trace-eq {
@@ -587,6 +610,8 @@ body {
   font-size: 12px;
   color: var(--text-main);
   word-break: break-all;
+  order: 1;
+  flex-shrink: 0;
 }
 
 .trace-val {
@@ -594,6 +619,8 @@ body {
   font-weight: 700;
   font-size: 12.5px;
   color: var(--text-main);
+  order: 3;
+  flex-shrink: 0;
 }
 
 .trace-ref {

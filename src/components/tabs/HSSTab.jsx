@@ -7,6 +7,7 @@ import {
   FACE_TYPES,
   LENGTH_METHODS,
   LOAD_CASES,
+  COMMON_PLATE_T,
 } from "../../constants/steelData";
 import {
   calcWeldMetal,
@@ -331,10 +332,20 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                     })}
                   </select>
                 </Field>
-                <InchInput label="Plate tp" value={plateT} onChange={setPlateT} id="plate-thickness" />
-              </div>
-              <div>
-                <PlateQuickPick value={plateT} onChange={setPlateT} />
+                <Field label="Plate tp" id="plate-thickness-select">
+                  <select
+                    id="plate-thickness-select"
+                    value={plateT}
+                    onChange={(e) => setPlateT(parseFloat(e.target.value))}
+                    className="form-select compact"
+                  >
+                    {COMMON_PLATE_T.map((t) => (
+                      <option key={t} value={t}>
+                        {toFraction(t)} ({t.toFixed(3)}")
+                      </option>
+                    ))}
+                  </select>
+                </Field>
               </div>
             </div>
           ) : (
@@ -651,8 +662,10 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
           </div>
         )}
 
-        {/* Effective Length Trace (Collapsible) */}
-        {faceLen && (() => {
+        {/* Checks grid (2 columns side-by-side) */}
+        <div className="checks-grid">
+          {/* Effective Length Trace (Collapsible) */}
+          {faceLen && (() => {
           let traceSteps = [];
           let codeRef = "";
 
@@ -825,6 +838,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
             }}
           />
         )}
+        </div>
 
         {/* Governing limit DCR box */}
         {governing && governing.status && (
