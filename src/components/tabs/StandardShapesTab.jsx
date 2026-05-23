@@ -208,9 +208,9 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
                       justifyContent: "space-between",
                       alignItems: "center",
                       width: "100%",
-                      border: "1px solid #d1d5db",
+                      border: isActive ? "1px solid var(--primary)" : "1px solid var(--border-color)",
                       borderRadius: "var(--radius-sm)",
-                      backgroundColor: isActive ? "var(--primary-light)" : "#fff",
+                      backgroundColor: isActive ? "var(--primary-light)" : "var(--card-bg)",
                       color: isActive ? "var(--primary-dark)" : "var(--text-main)",
                       cursor: "pointer"
                     }}
