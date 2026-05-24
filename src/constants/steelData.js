@@ -122,15 +122,15 @@ export const FACE_TYPES = [
 export const LENGTH_METHODS = [
   {
     id: "aisc",
-    label: "AISC code (strict)",
-    short: "AISC",
+    label: "AISC §J2.4 (Full Length)",
+    short: "AISC §J2.4 (Full Length)",
     description:
       "Strict AISC 360 §K5 / J2.4 compliance. HSS-to-HSS transverse face uses Be (Eq. K1-1). HSS-to-plate uses the full nominal face length — per Tousignant & Packer (2015), the rigid plate keeps the weld fully effective and the non-uniform stress is captured by kds=1.0.",
   },
   {
     id: "k5",
-    label: "K5 Be (engineering judgment)",
-    short: "K5 Be",
+    label: "AISC §K5 (Reduced Be)",
+    short: "AISC §K5 (Reduced Be)",
     description:
       "Apply AISC §K5 Eq. K1-1 reduction to the transverse face for BOTH connection types. For HSS-to-plate, the plate is treated as the 'chord' with engineer-input dimension B and thickness t. For rigid plates (small B/t) the formula naturally returns Be = Bb (no reduction); for thin/flexible plates a meaningful reduction is applied. This is beyond strict AISC for HSS-to-plate but is a defensible conservative approach.",
   },

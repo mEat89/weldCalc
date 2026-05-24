@@ -20,7 +20,7 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
     weld, base, size, governing, faceLen, k5, loa, dCouple,
     effLenBlock,
     fnwEq, fnwRef, designEq, designRef,
-    baseT, baseFy, baseFu, baseLabel,
+    baseT, baseFy, baseFu, baseLabel, baseTNominal,
     thetaDeg, effectiveUseDirectional, lockDirectional, lockReason,
     selectedFaceNominal, faceDescription,
   } = calcs;
@@ -222,10 +222,10 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
       codeRef: "AISC 360-16 §J2.2b, Table J2.4",
       steps: [
         { eq: `Provided: w = ${toFraction(legSize)}`, codeRef: "User selected leg size", value: to16ths(legSize) },
-        { eq: `Min for t = ${toFraction(baseT)}: w_min = ${size.minLabel}`,
-          codeRef: "AISC 360-16 Table J2.4", value: size.minOk ? "OK" : "NG" },
-        { eq: `Max for t = ${toFraction(baseT)}: w_max = ${size.maxLabel}`,
-          codeRef: "AISC 360-16 §J2.2b thickness boundary", value: size.maxOk ? "OK" : "NG" },
+        { eq: `w ≥ w_min (min = ${size.minLabel})`,
+          codeRef: `AISC Table J2.4 (t_nom = ${toFraction(baseTNominal)})`, value: size.minOk ? "OK" : "NG" },
+        { eq: `w ≤ w_max (max = ${size.maxLabel})`,
+          codeRef: `AISC §J2.2b (t_nom = ${toFraction(baseTNominal)})`, value: size.maxOk ? "OK" : "NG" },
       ],
       statCards: [
         { label: "Min weld size", value: toFraction(size.minSize) },

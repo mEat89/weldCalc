@@ -58,7 +58,7 @@ export default function ReferencesModal({ onClose }) {
                     This reduction width is applied directly to the nominal branch face dimension being checked, representing out-of-plane flexibility limits.
                   </li>
                   <li>
-                    <strong>Unitary Weld Line Capacity Analysis:</strong> The calculator designs a single weld line at a time. The resulting effective throat ($t_e = 0.707 \cdot w$), nominal shear stress ($Fnw = 0.60 \cdot FEXX$), and base metal capacities (§J4.2) are calculated as unitary properties for the selected line and are not multiplied by 2.
+                    <strong>Unitary Weld Line Capacity Analysis:</strong> The calculator analyzes a single weld line in isolation (the selected face) rather than summing both opposite sides. The demand allocated to this line is its exact tributary load share (via perimeter or moment couple sharing), and is compared directly against the capacity of that single weld line (effective throat te = 0.707 · w, nominal shear stress Fnw = 0.60 · FEXX). This unitary check is mathematically identical to group-based checking but provides granular, face-specific transparency.
                   </li>
                 </ul>
               </div>
@@ -100,7 +100,7 @@ export default function ReferencesModal({ onClose }) {
                     <div style={{ fontFamily: "monospace", margin: "4px auto", fontSize: "11.5px", maxWidth: "450px", textAlign: "center", padding: "6px", backgroundColor: "var(--surface-muted)", borderRadius: "4px", border: "1px solid var(--border-color)" }}>
                       φMn = φ · Fy · Zp = 0.90 · Fy · (bp · tp^2 / 4)
                     </div>
-                    Where $\phi = 0.90$ is the LRFD strength reduction factor for plate flexural yielding.
+                    Where φ = 0.90 is the LRFD strength reduction factor for plate flexural yielding.
                   </li>
                   <li>
                     <strong>Plate Rigidity Parameter (Stiffness Verification):</strong> Evaluates out-of-plane plate bending and stiffness. Insufficiently rigid plates lead to localized flexural yielding, non-uniform concrete bearing pressure, and excessive prying forces on anchoring systems. The calculator computes the minimum required thickness and deflection ratios to guarantee rigid behavior.
@@ -121,14 +121,14 @@ export default function ReferencesModal({ onClose }) {
                   Specification for Structural Steel Buildings (LRFD Only)
                 </em>
                 <ul className="refs-list mt-1" style={{ paddingLeft: "16px", fontSize: "13px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                  <li>§J2.2a — Fillet weld effective throat ($t_e = 0.707 \cdot w$).</li>
+                  <li>§J2.2a — Fillet weld effective throat (te = 0.707 · w).</li>
                   <li>§J2.2b &amp; Table J2.4 — Minimum and maximum fillet weld leg sizes based on thinner joined part thickness.</li>
-                  <li>§J2.2b &amp; Eq. J2-1 — Longitudinal fillet weld length reduction factor $\beta = 1.2 - 0.002 \cdot (L/w) \le 1.0$ (when ratio exceeds 100). Capped at 0.60 for ratio &gt; 300.</li>
+                  <li>§J2.2b &amp; Eq. J2-1 — Longitudinal fillet weld length reduction factor β = 1.2 - 0.002 · (L/w) &le; 1.0 (when ratio exceeds 100). Capped at 0.60 for ratio &gt; 300.</li>
                   <li>§J2.4 &amp; Eq. J2-5 — Fillet weld metal shear strength; LRFD φ = 0.75. Directional factor kds locked to 1.0 for HSS connections per Chapter K Commentary, but available (up to 1.5) for standard shapes.</li>
-                  <li>§J4.2 &amp; Eqs. J4-3 / J4-4 — Base metal shear yielding ($\phi = 1.00$) and base metal shear rupture ($\phi = 0.75$) limits.</li>
-                  <li>§K1.2.2a &amp; Eq. K1-1 — Hollow Structural Section connection uneven stress effective width $B_e$ calculation for transverse walls.</li>
-                  <li>§K5 Table K5.1 — Standardized effective weld lengths; parallel welds fully effective, transverse welds reduced to $B_e$.</li>
-                  <li>Chapter F — Flexural design of plate elements ($\phi = 0.90$) under flexural yielding.</li>
+                  <li>§J4.2 &amp; Eqs. J4-3 / J4-4 — Base metal shear yielding (φ = 1.00) and base metal shear rupture (φ = 0.75) limits.</li>
+                  <li>§K1.2.2a &amp; Eq. K1-1 — Hollow Structural Section connection uneven stress effective width Be calculation for transverse walls.</li>
+                  <li>§K5 Table K5.1 — Standardized effective weld lengths; parallel welds fully effective, transverse welds reduced to Be.</li>
+                  <li>Chapter F — Flexural design of plate elements (φ = 0.90) under flexural yielding.</li>
                 </ul>
               </li>
 
@@ -152,7 +152,7 @@ export default function ReferencesModal({ onClose }) {
                   Base Plate and Anchor Rod Design (Fisher &amp; Kloiber)
                 </em>
                 <span style={{ fontSize: "13px", display: "block", lineHeight: "1.4" }}>
-                  Section 3.4 outlines base plate thickness design checks under moment + axial loads, specifying plastic section bending capacity checks with LRFD $\phi = 0.90$ strength reduction.
+                  Section 3.4 outlines base plate thickness design checks under moment + axial loads, specifying plastic section bending capacity checks with LRFD φ = 0.90 strength reduction.
                 </span>
               </li>
 

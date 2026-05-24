@@ -259,8 +259,8 @@ export function calcWeldSize(input: WeldSizeInput): WeldSizeResult {
     else if (baseT <= 0.75) { minSize = 0.25;   minLabel = '1/4"'; }
     else                    { minSize = 0.3125; minLabel = '5/16"'; }
 
-    const maxSize = baseT < 0.25 ? baseT : baseT - 0.0625;
-    const maxLabel = baseT < 0.25
+    const maxSize = baseT <= 0.25 ? baseT : baseT - 0.0625;
+    const maxLabel = baseT <= 0.25
       ? `t = ${toFraction(baseT)}`
       : `t − 1/16" = ${toFraction(maxSize)}`;
 

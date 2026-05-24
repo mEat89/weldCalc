@@ -180,6 +180,11 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
     baseLabel = "Chord wall";
   }
 
+  // Constructability and detailing weld limits are checked against clean nominal thicknesses
+  const baseTNominal = connType === "hss2plate"
+    ? Math.min(plateT, branch.tNom)
+    : Math.min(chord.tNom, branch.tNom);
+
   // Directional strength increase (kds) lock policies
   const lockDirectional =
     solicitation === "tension" ||
@@ -208,7 +213,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
         baseT, fy: baseFy, fu: baseFu, length: faceLen.length, nLines: 1,
         method: "lrfd", appliedLoad: pFace,
       });
-      size = calcWeldSize({ legSize, baseT });
+      size = calcWeldSize({ legSize, baseT: baseTNominal });
     } catch (e) { calcError = e instanceof Error ? e.message : String(e); }
   }
 
@@ -345,7 +350,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                   weld, base, size, governing, faceLen, k5, loa, dCouple,
                   effLenBlock: effLenBlockForReport,
                   fnwEq, fnwRef, designEq, designRef,
-                  baseT, baseFy, baseFu, baseLabel,
+                  baseT, baseFy, baseFu, baseLabel, baseTNominal,
                   thetaDeg, effectiveUseDirectional, lockDirectional, lockReason,
                   selectedFaceNominal, faceDescription,
                 },
@@ -388,25 +393,25 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
               onClick={() => setSolicitation("shear")}
               className={`toggle-option-btn compact ${solicitation === "shear" ? "active" : ""}`}
               type="button"
-              style={{ padding: "6px 2px", fontSize: "10px" }}
+              style={{ padding: "6px", fontSize: "11px", display: "flex", justifyContent: "center", alignItems: "center", width: "100%" }}
             >
-              <div className="btn-main-label" style={{ fontSize: "10px", fontWeight: "700" }}>Shear</div>
+              <div className="btn-main-label" style={{ fontSize: "11px", fontWeight: "700", textAlign: "center", width: "100%" }}>Shear</div>
             </button>
             <button
               onClick={() => setSolicitation("tension")}
               className={`toggle-option-btn compact ${solicitation === "tension" ? "active" : ""}`}
               type="button"
-              style={{ padding: "6px 2px", fontSize: "10px" }}
+              style={{ padding: "6px", fontSize: "11px", display: "flex", justifyContent: "center", alignItems: "center", width: "100%" }}
             >
-              <div className="btn-main-label" style={{ fontSize: "10px", fontWeight: "700" }}>Tension</div>
+              <div className="btn-main-label" style={{ fontSize: "11px", fontWeight: "700", textAlign: "center", width: "100%" }}>Tension</div>
             </button>
             <button
               onClick={() => setSolicitation("moment")}
               className={`toggle-option-btn compact ${solicitation === "moment" ? "active" : ""}`}
               type="button"
-              style={{ padding: "6px 2px", fontSize: "10px" }}
+              style={{ padding: "6px", fontSize: "11px", display: "flex", justifyContent: "center", alignItems: "center", width: "100%" }}
             >
-              <div className="btn-main-label" style={{ fontSize: "10px", fontWeight: "700" }}>Moment</div>
+              <div className="btn-main-label" style={{ fontSize: "11px", fontWeight: "700", textAlign: "center", width: "100%" }}>Moment</div>
             </button>
           </div>
         </div>
@@ -513,15 +518,28 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                   type="button"
                   style={{
                     padding: "6px 24px 6px 6px",
-                    fontSize: "11px",
+                    fontSize: "10.5px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     position: "relative",
                     width: "100%",
+                    minHeight: "36px",
                   }}
                 >
-                  <span className="btn-main-label" style={{ fontSize: "11px", fontWeight: "700" }}>{m.short}</span>
+                  <span
+                    className="btn-main-label"
+                    style={{
+                      fontSize: "10.5px",
+                      fontWeight: "700",
+                      textAlign: "center",
+                      display: "block",
+                      width: "100%",
+                      lineHeight: "1.2"
+                    }}
+                  >
+                    {m.short}
+                  </span>
                   <div
                     className="info-tooltip-container"
                     style={{
@@ -693,93 +711,98 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
           </div>
 
           {/* Column 2: Load case / direction (Compacted) */}
-          <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", gap: "6px", opacity: solicitation === "shear" ? 1 : 0.65 }}>
-            <div className="card-section-label">Load Case &amp; Direction</div>
-            {solicitation === "shear" ? (
-              <>
-                <div className="load-case-btn-grid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: "4px" }}>
-                  {LOAD_CASES.map((c) => {
-                    const isActive = loadCase === c.id;
-                    return (
-                      <button
-                        key={c.id}
-                        onClick={() => setLoadCase(c.id)}
-                        className={`load-case-btn compact ${isActive ? "active" : ""}`}
-                        type="button"
-                        style={{
-                          padding: "5px 8px",
-                          fontSize: "11px",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          width: "100%",
-                          border: isActive ? "1px solid var(--primary)" : "1px solid var(--border-color)",
-                          borderRadius: "var(--radius-sm)",
-                          backgroundColor: isActive ? "var(--primary-light)" : "var(--card-bg)",
-                          color: isActive ? "var(--primary-dark)" : "var(--text-main)",
-                          cursor: "pointer"
-                        }}
-                      >
-                        <span style={{ fontWeight: "700" }}>{c.label}</span>
-                        <span style={{ fontSize: "10px", opacity: 0.8 }}>{c.angle}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                
-                <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px", lineHeight: "1.3" }}>
-                  {LOAD_CASES.find((c) => c.id === loadCase)?.description}
-                </div>
+          <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: "100%", boxSizing: "border-box" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
+              <div className="card-section-label">Load Case &amp; Direction</div>
+              <div style={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "center", opacity: solicitation === "shear" ? 1 : 0.6 }}>
+                {solicitation === "shear" ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <div className="load-case-btn-grid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: "4px" }}>
+                      {LOAD_CASES.map((c) => {
+                        const isActive = loadCase === c.id;
+                        return (
+                          <button
+                            key={c.id}
+                            onClick={() => setLoadCase(c.id)}
+                            className={`load-case-btn compact ${isActive ? "active" : ""}`}
+                            type="button"
+                            style={{
+                              padding: "5px 8px",
+                              fontSize: "11px",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              width: "100%",
+                              border: isActive ? "1px solid var(--primary)" : "1px solid var(--border-color)",
+                              borderRadius: "var(--radius-sm)",
+                              backgroundColor: isActive ? "var(--primary-light)" : "var(--card-bg)",
+                              color: isActive ? "var(--primary-dark)" : "var(--text-main)",
+                              cursor: "pointer"
+                            }}
+                          >
+                            <span style={{ fontWeight: "700" }}>{c.label}</span>
+                            <span style={{ fontSize: "10px", opacity: 0.8 }}>{c.angle}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px", lineHeight: "1.3" }}>
+                      {LOAD_CASES.find((c) => c.id === loadCase)?.description}
+                    </div>
 
-                {loadCase === "trans" && (
-                  <div style={{ marginTop: "4px", fontSize: "11px", backgroundColor: "var(--primary-light)", border: "1px solid var(--border-color)", color: "var(--primary-dark)", padding: "4px 6px", borderRadius: "var(--radius-sm)" }}>
-                    {lockDirectional ? (
-                      <span style={{ color: "inherit", fontWeight: "600", fontSize: "10px" }}>
-                        kds = 1.0 Locked: {connType === "hss2hss" ? "HSS branch weld non-uniformity" : "K5 Be mode"}
-                      </span>
-                    ) : (
-                      <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "10px", color: "inherit" }}>
+                    {loadCase === "trans" && (
+                      <div style={{ marginTop: "4px", fontSize: "11px", backgroundColor: "var(--primary-light)", border: "1px solid var(--border-color)", color: "var(--primary-dark)", padding: "4px 6px", borderRadius: "var(--radius-sm)" }}>
+                        {lockDirectional ? (
+                          <span style={{ color: "inherit", fontWeight: "600", fontSize: "10px" }}>
+                            kds = 1.0 Locked: {connType === "hss2hss" ? "HSS branch weld non-uniformity" : "K5 Be mode"}
+                          </span>
+                        ) : (
+                          <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "10px", color: "inherit" }}>
+                            <input
+                              type="checkbox"
+                              checked={!useDirectional}
+                              onChange={(e) => setUseDirectional(!e.target.checked)}
+                              style={{ cursor: "pointer" }}
+                            />
+                            <span>Suppress 1.5× directional increase</span>
+                          </label>
+                        )}
+                      </div>
+                    )}
+                    
+                    {loadCase === "angle" && (
+                      <div style={{ marginTop: "4px" }}>
+                        <label className="form-label" style={{ fontSize: "10px", display: "flex", justifyContent: "space-between" }}>
+                          <span>Load angle:</span>
+                          <strong>{angleDeg}°</strong>
+                        </label>
                         <input
-                          type="checkbox"
-                          checked={!useDirectional}
-                          onChange={(e) => setUseDirectional(!e.target.checked)}
-                          style={{ cursor: "pointer" }}
+                          type="range"
+                          min="0"
+                          max="90"
+                          step="1"
+                          value={angleDeg}
+                          onChange={(e) => setAngleDeg(parseInt(e.target.value, 10))}
+                          style={{ width: "100%", marginTop: "2px" }}
                         />
-                        <span>Suppress 1.5× directional increase</span>
-                      </label>
+                      </div>
                     )}
                   </div>
-                )}
-                
-                {loadCase === "angle" && (
-                  <div style={{ marginTop: "4px" }}>
-                    <label className="form-label" style={{ fontSize: "10px", display: "flex", justifyContent: "space-between" }}>
-                      <span>Load angle:</span>
-                      <strong>{angleDeg}°</strong>
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="90"
-                      step="1"
-                      value={angleDeg}
-                      onChange={(e) => setAngleDeg(parseInt(e.target.value, 10))}
-                      style={{ width: "100%", marginTop: "2px" }}
-                    />
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center", padding: "8px 12px", color: "var(--text-muted)", fontSize: "11px", lineHeight: "1.4" }}>
+                    <span style={{ fontWeight: "700" }}>🔒 Directional parameters inactive</span>
+                    <span style={{ fontSize: "10px", marginTop: "4px", opacity: 0.85 }}>
+                      {solicitation === "tension"
+                        ? "Tension acts perpendicular (normal) to the base plate. Arrow orientation is fixed out-of-plane."
+                        : "Moment couple tension acts normal to the checked flange weld chord. Load orientation is fixed."}
+                    </span>
                   </div>
                 )}
-              </>
-            ) : (
-              <div style={{ display: "flex", flex: 1, flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center", padding: "12px", color: "var(--text-muted)", fontSize: "11px", lineHeight: "1.4" }}>
-                <span>🔒 Directional parameters inactive</span>
-                <span style={{ fontSize: "10px", marginTop: "6px" }}>
-                  {solicitation === "tension"
-                    ? "Tension acts perpendicular (normal) to the base plate. Arrow orientation is fixed out-of-plane."
-                    : "Moment couple tension acts normal to the checked flange weld chord. Load orientation is fixed."}
-                </span>
               </div>
-            )}
-            <div style={{ marginTop: "10px", paddingTop: "8px", borderTop: "1px dashed var(--border-color)" }}>
+            </div>
+
+            <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px dashed var(--border-color)" }}>
               {solicitation === "moment" ? (
                 <>
                   <label htmlFor="demand-moment-input" style={{ fontSize: "11px", fontWeight: "700", color: "var(--primary-dark)", display: "block", marginBottom: "4px", whiteSpace: "nowrap" }}>
@@ -793,7 +816,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                     value={appliedMoment}
                     onChange={(e) => setAppliedMoment(parseFloat(e.target.value) || 0)}
                     className="form-input"
-                    style={{ fontSize: "13.5px", fontWeight: "700", padding: "6px 10px", borderColor: "var(--primary)", backgroundColor: "var(--primary-light)" }}
+                    style={{ fontSize: "13.5px", fontWeight: "700", padding: "6px 10px", borderColor: "var(--primary)", backgroundColor: "var(--primary-light)", width: "100%", boxSizing: "border-box" }}
                   />
                 </>
               ) : (
@@ -809,7 +832,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                     value={appliedLoad}
                     onChange={(e) => setAppliedLoad(parseFloat(e.target.value) || 0)}
                     className="form-input"
-                    style={{ fontSize: "13.5px", fontWeight: "700", padding: "6px 10px", borderColor: "var(--primary)", backgroundColor: "var(--primary-light)" }}
+                    style={{ fontSize: "13.5px", fontWeight: "700", padding: "6px 10px", borderColor: "var(--primary)", backgroundColor: "var(--primary-light)", width: "100%", boxSizing: "border-box" }}
                   />
                 </>
               )}
@@ -943,10 +966,10 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
             tooltipSections={TOOLTIP_DATA.weldSize}
             traceSteps={[
               { eq: `Provided: w = ${toFraction(legSize)}`, codeRef: "User selected leg size", value: to16ths(legSize) },
-              { eq: `Min for t = ${toFraction(baseT)}: w_min = ${size.minLabel}`,
-                codeRef: "AISC 360-16 Table J2.4", value: size.minOk ? "OK" : "NG" },
-              { eq: `Max for t = ${toFraction(baseT)}: w_max = ${size.maxLabel}`,
-                codeRef: "AISC 360-16 §J2.2b thickness boundary", value: size.maxOk ? "OK" : "NG" },
+              { eq: `w ≥ w_min (min = ${size.minLabel})`,
+                codeRef: `AISC Table J2.4 (t_nom = ${toFraction(baseTNominal)})`, value: size.minOk ? "OK" : "NG" },
+              { eq: `w ≤ w_max (max = ${size.maxLabel})`,
+                codeRef: `AISC §J2.2b (t_nom = ${toFraction(baseTNominal)})`, value: size.maxOk ? "OK" : "NG" },
             ]}
             statCards={[
               { label: "Min weld size", value: toFraction(size.minSize) },
