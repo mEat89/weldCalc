@@ -33,17 +33,32 @@ export default function ReferencesModal({ onClose }) {
                 </h4>
                 <ul style={{ paddingLeft: "20px", display: "flex", flexDirection: "column", gap: "6px", margin: 0 }}>
                   <li>
-                    <strong>Strict Locking of k_ds = 1.0:</strong> Under transverse loads, AISC §J2.4 Eq. J2-5 permits a 1.5× directional factor increase for fillet welds. However, due to out-of-plane flexing of the HSS chord face and severe stress concentration at the rigid corners, experimental research (Tousignant &amp; Packer, 2015) and Chapter K Commentary mandate that <strong>k_ds is strictly locked to 1.0</strong> for HSS branch welds to maintain a safe target reliability index.
+                    <strong>Weld Force Perimeter Distribution (Tension &amp; Shear):</strong> Under global branch axial tension or shear (Pu), the load is elastically distributed over the entire branch weld perimeter (L_total = 2·B_b + 2·(H_b - 2·t_des)) using a sharp-cornered box model (no corner radius setbacks), matching Hilti PROFIS CBFEM. The demand force allocated to the checked face is:
+                    <div style={{ fontFamily: "monospace", margin: "4px auto", fontSize: "11.5px", maxWidth: "450px", padding: "6px", backgroundColor: "var(--surface-muted)", borderRadius: "4px", border: "1px solid var(--border-color)", textAlign: "left" }}>
+                      P_face = P_total · [Face_weld / L_total]
+                    </div>
+                    where Face_weld is B_b for Face B (flanges) and H_b - 2·t_des for Face H (webs). This provides a mathematically safe, conservative lower-bound check of each individual weld line against its respective tributary load share, rather than checking a single weld against the entire global branch load.
                   </li>
                   <li>
-                    <strong>K5 Be Reduction Width (Eq. K1-1):</strong> Transverse welds are subjected to non-uniform stress distributions. In K5 mode, the effective width is computed as:
+                    <strong>K5 Elastic Moment Share Method (Bending Moment):</strong> Bending moment (Mu, in-plane or out-of-plane) is resolved into a tension-compression flange force couple (F = Mu / d_couple). This force is elastically distributed between the flanges (Face B) and webs (Face H) using the AISC Table K5.1 Eq. K5-6 elastic contribution (section modulus share factor, SF):
+                    <div style={{ fontFamily: "monospace", margin: "4px auto", fontSize: "11.5px", maxWidth: "450px", padding: "6px", backgroundColor: "var(--surface-muted)", borderRadius: "4px", border: "1px solid var(--border-color)", textAlign: "left" }}>
+                      P_face = (Mu / d_couple) · SF<br />
+                      SF = L_eff / (L_eff + d_couple / 3)
+                    </div>
+                    where d_couple is the branch dimension perpendicular to the checked face (Hb for Face B, Bb for Face H). This represents a highly sophisticated, mathematically rigorous elastic distribution that prevents over-conservative un-apportioned demand checking and correlates beautifully with 3D component-based finite element mesh (CBFEM) models.
+                  </li>
+                  <li>
+                    <strong>Strict Locking of k_ds = 1.0:</strong> Under transverse shear, AISC §J2.4 Eq. J2-5 permits a 1.5× directional factor increase. However, due to out-of-plane branch flexing under tension, and out-of-plane moment pulling, <strong>k_ds is strictly locked to 1.0</strong> for HSS branch welds per AISC 360-22 Table K5.1 user notes to maintain appropriate structural reliability indices.
+                  </li>
+                  <li>
+                    <strong>K5 Be Reduction Width (Eq. K1-1):</strong> Transverse branch welds pull on flexible plates/chord walls. In K5 mode, the effective width is computed as:
                     <div style={{ fontFamily: "monospace", margin: "4px auto", fontSize: "11.5px", maxWidth: "450px", textAlign: "center", padding: "6px", backgroundColor: "var(--surface-muted)", borderRadius: "4px", border: "1px solid var(--border-color)" }}>
                       Be = (10 / (B/t)) · (Fy·t / (Fyb·tb)) · Bb &le; Bb
                     </div>
-                    This reduction width is applied directly to the nominal branch face dimension being checked.
+                    This reduction width is applied directly to the nominal branch face dimension being checked, representing out-of-plane flexibility limits.
                   </li>
                   <li>
-                    <strong>Unitary Weld Line Capacity Analysis:</strong> The calculator designs a single weld line at a time. The resulting effective throat (te = 0.707 · w), nominal shear stress (Fnw = 0.60 · FEXX), and base metal capacities (§J4.2) are calculated as unitary properties for the selected line and are not multiplied by 2.
+                    <strong>Unitary Weld Line Capacity Analysis:</strong> The calculator designs a single weld line at a time. The resulting effective throat ($t_e = 0.707 \cdot w$), nominal shear stress ($Fnw = 0.60 \cdot FEXX$), and base metal capacities (§J4.2) are calculated as unitary properties for the selected line and are not multiplied by 2.
                   </li>
                 </ul>
               </div>

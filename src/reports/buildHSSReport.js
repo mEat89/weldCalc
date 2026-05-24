@@ -81,7 +81,7 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
         { label: "Demand on face, P_face", value: pFace > 0 ? `${pFace.toFixed(2)} kips` : "0 (no demand)" },
       ] : [
         { label: "Total branch load, P_total", value: appliedLoad > 0 ? `${appliedLoad.toFixed(2)} kips` : "0 (no demand)" },
-        { label: "Face share factor", value: `${(selectedFaceNominal / (2 * (branch.B + branch.H)) * 100).toFixed(1)}%` },
+        { label: "Face share factor", value: `${(selectedFaceNominal / (2 * branch.B + 2 * (branch.H - 2 * branch.tDes)) * 100).toFixed(1)}%` },
         { label: "Demand on face, P_face", value: pFace > 0 ? `${pFace.toFixed(2)} kips` : "0 (no demand)" },
       ],
     },
@@ -132,11 +132,11 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
       eq: `P_face = [M·12 / d_couple] · [L_eff / (L_eff + d_couple/3)] = [${appliedMoment.toFixed(2)}·12 / ${dCouple.toFixed(2)}] · [${L_eff.toFixed(3)} / (${L_eff.toFixed(3)} + ${(dCouple/3).toFixed(3)})]`,
       codeRef: "AISC Table K5.1 elastic moment share distribution", value: `${pFace.toFixed(2)} kips`
     } : solicitation === "tension" ? {
-      eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
-      codeRef: "Tension force perimeter distribution", value: `${pFace.toFixed(2)} kips`
+      eq: `P_face = P·[${faceSymbol} / L_total] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal.toFixed(3)} / ${(2 * branch.B + 2 * (branch.H - 2 * branch.tDes)).toFixed(3)}]`,
+      codeRef: "Tension force sharp-corner perimeter distribution", value: `${pFace.toFixed(2)} kips`
     } : {
-      eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
-      codeRef: "Weld force perimeter distribution", value: `${pFace.toFixed(2)} kips`
+      eq: `P_face = P·[${faceSymbol} / L_total] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal.toFixed(3)} / ${(2 * branch.B + 2 * (branch.H - 2 * branch.tDes)).toFixed(3)}]`,
+      codeRef: "Weld force sharp-corner perimeter distribution", value: `${pFace.toFixed(2)} kips`
     };
 
     const steps = [
@@ -181,11 +181,11 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
       eq: `P_face = [M·12 / d_couple] · [L_eff / (L_eff + d_couple/3)] = [${appliedMoment.toFixed(2)}·12 / ${dCouple.toFixed(2)}] · [${L_eff.toFixed(3)} / (${L_eff.toFixed(3)} + ${(dCouple/3).toFixed(3)})]`,
       codeRef: "AISC Table K5.1 elastic moment share distribution", value: `${pFace.toFixed(2)} kips`
     } : solicitation === "tension" ? {
-      eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
-      codeRef: "Tension force perimeter distribution", value: `${pFace.toFixed(2)} kips`
+      eq: `P_face = P·[${faceSymbol} / L_total] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal.toFixed(3)} / ${(2 * branch.B + 2 * (branch.H - 2 * branch.tDes)).toFixed(3)}]`,
+      codeRef: "Tension force sharp-corner perimeter distribution", value: `${pFace.toFixed(2)} kips`
     } : {
-      eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
-      codeRef: "Weld force perimeter distribution", value: `${pFace.toFixed(2)} kips`
+      eq: `P_face = P·[${faceSymbol} / L_total] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal.toFixed(3)} / ${(2 * branch.B + 2 * (branch.H - 2 * branch.tDes)).toFixed(3)}]`,
+      codeRef: "Weld force sharp-corner perimeter distribution", value: `${pFace.toFixed(2)} kips`
     };
 
     checks.push({

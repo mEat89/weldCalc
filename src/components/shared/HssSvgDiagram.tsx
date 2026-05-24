@@ -4,6 +4,7 @@ interface HssSvgDiagramProps {
   loadCase: "long" | "trans" | "angle";
   angleDeg: number;
   solicitation?: "shear" | "tension" | "moment";
+  connType?: "hss2plate" | "hss2hss";
 }
 
 export default function HssSvgDiagram({
@@ -12,6 +13,7 @@ export default function HssSvgDiagram({
   loadCase,
   angleDeg,
   solicitation = "shear",
+  connType = "hss2plate",
 }: HssSvgDiagramProps) {
   const isBActive = selectedFaceDim === "B";
   const B_val = branch.B;
@@ -20,8 +22,124 @@ export default function HssSvgDiagram({
   const activeColor = "#2563eb";
   const inactiveColor = "#9ca3af";
 
+  // Render Horizontal Chord and perpendicular vertical Branch HSS for HSS-to-HSS connections
+  if (connType === "hss2hss") {
+    return (
+      <div className="svg-diagram-container">
+        <div className="svg-diagram-title">Connection Elevation &amp; Weld Joints</div>
+        <svg className="technical-drawing" width="360" height="175" viewBox="0 0 400 190">
+          {/* Background Area Grid */}
+          <rect x="20" y="5" width="360" height="180" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1" rx="4" />
+
+          {/* Dotted axis */}
+          <line x1="200" y1="5" x2="200" y2="185" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="4 4" />
+
+          {/* Horizontal Chord HSS at the bottom */}
+          <rect x="50" y="125" width="300" height="40" rx="3" fill="#cbd5e1" stroke="#475569" strokeWidth="2" />
+          {/* Chord wall thickness dashed line */}
+          <rect x="50" y="130" width="300" height="30" fill="none" stroke="#64748b" strokeWidth="1" strokeDasharray="3 3" />
+          <text x="60" y="149" className="drawing-dim-text" style={{ fill: "#475569", fontSize: "9px", fontWeight: "700" }}>Chord HSS</text>
+
+          {/* Vertical Branch HSS extending from chord top */}
+          <rect x="150" y="35" width="100" height="90" fill="#f1f5f9" stroke="#1e293b" strokeWidth="3" rx="4" />
+          {/* Branch wall thickness dashed line */}
+          <rect x="156" y="35" width="88" height="90" fill="none" stroke="#64748b" strokeWidth="1.5" strokeDasharray="3 3" />
+          <text x="200" y="85" textAnchor="middle" className="drawing-dim-text" style={{ fill: "#64748b", fontSize: "9px" }}>Branch</text>
+
+          {/* Fillet welds (blue triangles) at branch bottom corners - Face B Transverse Welds */}
+          <polygon points="140,125 150,125 150,115" fill={isBActive ? activeColor : inactiveColor} className={`drawing-weld-line ${isBActive ? "highlighted" : ""}`} />
+          <polygon points="260,125 250,125 250,115" fill={isBActive ? activeColor : inactiveColor} className={`drawing-weld-line ${isBActive ? "highlighted" : ""}`} />
+
+          {/* Horizontal Weld line at branch bottom edge - Face H Longitudinal Weld */}
+          <line x1="150" y1="123" x2="250" y2="123" stroke={!isBActive ? activeColor : inactiveColor} strokeWidth="3.5" className={`drawing-weld-line ${!isBActive ? "highlighted" : ""}`} />
+
+          <text x="35" y="24" textAnchor="start" className="drawing-dim-text" style={{ fontSize: "10px", fill: "#475569" }}>
+            HSS-to-HSS Side-Elevation View
+          </text>
+
+          {/* Legend indicator */}
+          <rect x="130" y="170" width="140" height="12" rx="2" fill="#eff6ff" stroke="#bfdbfe" strokeWidth="1" />
+          <text x="200" y="179" textAnchor="middle" className="drawing-dim-text" style={{ fill: "#1d4ed8", fontSize: "8px" }}>
+            Blue triangles = Fillet Welds
+          </text>
+
+          {/* Tension load case */}
+          {solicitation === "tension" && (
+            <g>
+              <line x1="200" y1="35" x2="200" y2="10" stroke="#ef4444" strokeWidth="2.5" markerEnd="url(#arrow-hss)" />
+              <text x="208" y="22" className="drawing-dim-text" style={{ fill: "#b91c1c", fontSize: "10px", fontWeight: "700" }}>Load P (Tension)</text>
+            </g>
+          )}
+
+          {/* Moment load case */}
+          {solicitation === "moment" && (
+            <g>
+              <path d="M 175 75 A 25 25 0 0 1 225 75" fill="none" stroke="#ef4444" strokeWidth="2.5" markerEnd="url(#arrow-hss)" />
+              <text x="200" y="60" textAnchor="middle" className="drawing-dim-text" style={{ fill: "#b91c1c", fontSize: "10px", fontWeight: "700" }}>Moment Mu</text>
+            </g>
+          )}
+
+          {/* Shear load cases */}
+          {solicitation === "shear" && (
+            isBActive ? (
+              /* Checked face B: weld runs out-of-page */
+              loadCase === "long" ? (
+                /* Longitudinal load acts parallel to weld = out-of-page */
+                <g>
+                  <circle cx="200" cy="22" r="7" fill="none" stroke="#ef4444" strokeWidth="2" />
+                  <circle cx="200" cy="22" r="2" fill="#ef4444" />
+                  <text x="212" y="26" className="drawing-dim-text" style={{ fill: "#b91c1c", fontSize: "10px", fontWeight: "700" }}>Load P (Longitudinal Out-of-Page)</text>
+                </g>
+              ) : loadCase === "trans" ? (
+                /* Transverse load acts perpendicular to weld = horizontal pushing */
+                <g>
+                  <line x1="200" y1="35" x2="250" y2="35" stroke="#ef4444" strokeWidth="2.5" markerEnd="url(#arrow-hss)" />
+                  <text x="205" y="25" className="drawing-dim-text" style={{ fill: "#b91c1c", fontSize: "10px", fontWeight: "700" }}>Load P (Transverse)</text>
+                </g>
+              ) : (
+                /* Angled */
+                <g>
+                  <line x1="200" y1="35" x2="235" y2="15" stroke="#ef4444" strokeWidth="2.5" markerEnd="url(#arrow-hss)" />
+                  <text x="195" y="10" className="drawing-dim-text" style={{ fill: "#b91c1c", fontSize: "10px", fontWeight: "700" }}>Load P ({angleDeg}°)</text>
+                </g>
+              )
+            ) : (
+              /* Checked face H: weld runs horizontally */
+              loadCase === "long" ? (
+                /* Longitudinal load acts parallel to weld = horizontal pushing */
+                <g>
+                  <line x1="200" y1="35" x2="250" y2="35" stroke="#ef4444" strokeWidth="2.5" markerEnd="url(#arrow-hss)" />
+                  <text x="205" y="25" className="drawing-dim-text" style={{ fill: "#b91c1c", fontSize: "10px", fontWeight: "700" }}>Load P (Longitudinal)</text>
+                </g>
+              ) : loadCase === "trans" ? (
+                /* Transverse load acts perpendicular to weld = out-of-page */
+                <g>
+                  <circle cx="200" cy="22" r="7" fill="none" stroke="#ef4444" strokeWidth="2" />
+                  <circle cx="200" cy="22" r="2" fill="#ef4444" />
+                  <text x="212" y="26" className="drawing-dim-text" style={{ fill: "#b91c1c", fontSize: "10px", fontWeight: "700" }}>Load P (Transverse Out-of-Page)</text>
+                </g>
+              ) : (
+                /* Angled */
+                <g>
+                  <line x1="200" y1="35" x2="235" y2="15" stroke="#ef4444" strokeWidth="2.5" markerEnd="url(#arrow-hss)" />
+                  <text x="195" y="10" className="drawing-dim-text" style={{ fill: "#b91c1c", fontSize: "10px", fontWeight: "700" }}>Load P ({angleDeg}°)</text>
+                </g>
+              )
+            )
+          )}
+
+          <defs>
+            <marker id="arrow-hss" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#ef4444" />
+            </marker>
+          </defs>
+        </svg>
+      </div>
+    );
+  }
+
+  // Render Elevation Side-View for tension and bending moment (HSS-to-Plate case)
   if (solicitation === "tension" || solicitation === "moment") {
-    // Render Elevation Side-View for tension and bending moment
     return (
       <div className="svg-diagram-container">
         <div className="svg-diagram-title">Connection Elevation &amp; Weld Joints</div>
@@ -39,9 +157,12 @@ export default function HssSvgDiagram({
           {/* Wall thickness dashed lines */}
           <rect x="151" y="35" width="98" height="110" fill="none" stroke="#64748b" strokeWidth="1.5" strokeDasharray="3 3" />
 
-          {/* Fillet welds on both sides */}
-          <polygon points="135,145 145,145 145,135" fill={activeColor} className="drawing-weld-line highlighted" />
-          <polygon points="265,145 255,145 255,135" fill={activeColor} className="drawing-weld-line highlighted" />
+          {/* Fillet welds on both sides - Face B Transverse Welds */}
+          <polygon points="135,145 145,145 145,135" fill={isBActive ? activeColor : inactiveColor} className={`drawing-weld-line ${isBActive ? "highlighted" : ""}`} />
+          <polygon points="265,145 255,145 255,135" fill={isBActive ? activeColor : inactiveColor} className={`drawing-weld-line ${isBActive ? "highlighted" : ""}`} />
+
+          {/* Horizontal Weld line at bottom - Face H Longitudinal Weld */}
+          <line x1="145" y1="143" x2="255" y2="143" stroke={!isBActive ? activeColor : inactiveColor} strokeWidth="3.5" className={`drawing-weld-line ${!isBActive ? "highlighted" : ""}`} />
 
           <text x="35" y="28" textAnchor="start" className="drawing-dim-text" style={{ fontSize: "10px", fill: "#475569" }}>
             HSS Side-Elevation View
@@ -79,7 +200,7 @@ export default function HssSvgDiagram({
     );
   }
 
-  // Overhaul geometry: long side vertical, shifted down to prevent clipping at the top
+  // Render Top-Down View for shear (HSS-to-Plate case)
   const wBox = 110;
   const hBox = 125;
   const xBox = 145;

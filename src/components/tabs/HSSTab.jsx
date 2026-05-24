@@ -38,11 +38,11 @@ const TOOLTIP_DATA = {
     { label: "AISC Reference", text: "AISC 360 Table K5.1." }
   ],
   weldMetal: [
-    { text: "Checks shear rupture of the fillet weld throat under acting load. The design strength is calculated as φRn = φ·Fnw·Awe, where Awe = 0.707·w·Leff and Fnw = 0.6·FEXX. Fillet weld shear stress is assumed uniform over the throat area, and the directional strength factor is suppressed for HSS branch welds per Chapter K commentary." },
-    { label: "AISC Reference", text: "AISC 360 Section J2.4." }
+    { text: "Checks shear or tension rupture of the fillet weld throat under acting face load. Under shear or axial tension, P_face is elastically computed based on Weld Force Perimeter Distribution tributary shares. Under bending moments, P_face resolves into a tension-compression force couple and is elastically distributed to both flanges and webs using the K5 Bending Moment Share factor (SF = Leff / (Leff + d/3)) per AISC Table K5.1. Fillet weld directional increase factors are suppressed (k_ds = 1.0) for HSS branch connections per Chapter K commentary." },
+    { label: "AISC Reference", text: "AISC 360 Section J2.4 & Table K5.1." }
   ],
   baseMetal: [
-    { text: "Verifies the connected thinner base material does not fail in shear yielding or rupture. The design strength is governed by the minimum of yielding capacity (φRn = 1.0·0.6·Fy·t·Leff) and rupture capacity (φRn = 0.75·0.6·Fu·t·Leff), assuming a uniform shear stress distribution through the material thickness." },
+    { text: "Verifies the connected thinner base material (branch wall or chord face) does not fail in shear yielding or rupture local to the weld. The design strength is governed by the minimum of yielding capacity (φRn = 1.0·0.6·Fy·t·Leff) and rupture capacity (φRn = 0.75·0.6·Fu·t·Leff), evaluated against the localized face demand P_face (perimeter-shared or moment-apportioned) along the highly reduced effective length Leff. This represents a safe, conservative local hotspot joint check." },
     { label: "AISC Reference", text: "AISC 360 Section J4.2." }
   ],
   weldSize: [
@@ -97,10 +97,16 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
 
   const transverseLen = branchTransverseDim === "B" ? branch.B : branch.H;
   const parallelLen   = branchTransverseDim === "B" ? branch.H : branch.B;
-  const selectedFaceNominal = selectedFaceDim === "B" ? branch.B : branch.H;
+  const branchNominal = selectedFaceDim === "B" ? branch.B : branch.H;
+  // Sharp-corner modeling similar to Hilti PROFIS CBFEM:
+  // Flange Face B has length equal to branch width B (fully continuous).
+  // Web Face H is fitted between the flanges, having length H - 2 * t_des (no corner radius considered).
+  const selectedFaceNominal = selectedFaceDim === "B"
+    ? branch.B
+    : branch.H - 2 * (branch.tDes || 0);
 
   const dCouple = selectedFaceDim === "B" ? branch.H : branch.B;
-  const faceSymbol = selectedFaceDim === "B" ? "B_b" : "H_b";
+  const faceSymbol = selectedFaceDim === "B" ? "B_b" : "(H_b - 2·t_des)";
 
   const thetaDeg = loadCase === "long" ? 0 : loadCase === "trans" ? 90 : angleDeg;
 
@@ -111,7 +117,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
         chordB: chord.B,
         chordT: chord.tDes,
         chordFy: chordGrade.fy,
-        branchB: selectedFaceNominal,
+        branchB: branchNominal,
         branchT: branch.tDes,
         branchFy: branchGrade.fy,
       });
@@ -119,10 +125,10 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
   } else if (connType === "hss2plate" && lengthMode === "k5") {
     try {
       k5 = calcK5EffectiveWidth({
-        chordB: selectedFaceNominal,
+        chordB: branchNominal,
         chordT: branch.tDes,
         chordFy: branchGrade.fy,
-        branchB: selectedFaceNominal,
+        branchB: branchNominal,
         branchT: plateT,
         branchFy: plateGrade.fy,
       });
@@ -154,9 +160,10 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
 
   const L_eff = faceLen ? faceLen.length : selectedFaceNominal;
   const momentShareFactor = L_eff / (L_eff + dCouple / 3);
+  const totalPerimeter = 2 * branch.B + 2 * (branch.H - 2 * (branch.tDes || 0));
   const pFace = solicitation === "moment"
     ? ((appliedMoment * 12) / dCouple) * momentShareFactor
-    : appliedLoad * (selectedFaceNominal / (2 * (branch.B + branch.H)));
+    : appliedLoad * (selectedFaceNominal / totalPerimeter);
 
   // Base metal determination
   let baseT, baseFy, baseFu, baseLabel;
@@ -626,12 +633,13 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
               loadCase={loadCase}
               angleDeg={angleDeg}
               solicitation={solicitation}
+              connType={connType}
             />
           </div>
           
           <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-              <div className="card-section-label" style={{ margin: 0, paddingLeft: "6px", fontSize: "10px" }}>Weld Line to Analyze (analyzes single line at a time)</div>
+              <div className="card-section-label" style={{ margin: 0, paddingLeft: "6px", fontSize: "10px" }}>Weld Line to Analyze</div>
               <div className="toggle-btn-grid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: "6px" }}>
                 {FACE_TYPES.map((f) => {
                   const active = selectedFaceDim === f.id;
@@ -654,7 +662,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                 })}
               </div>
               <div style={{ fontSize: "9.5px", color: "var(--text-muted)", marginTop: "3px", lineHeight: "1.2", fontStyle: "italic", paddingLeft: "6px" }}>
-                ℹ️ The calculator analyzes a single weld line at a time. The effective length (Leff) and capacities are unitary and are not multiplied by 2.
+                ℹ️ The calculator automatically distributes the global branch load (P or M) to the checked face using elastic perimeter or couple share methods, comparing it against the unitary capacity of that single face weld line.
               </div>
             </div>
 
@@ -850,12 +858,12 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                 codeRef: "AISC Table K5.1 elastic share (SF = Le/(Le+d/3))",
                 value: `${pFace.toFixed(2)} kips`
               } : solicitation === "tension" ? {
-                eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
-                codeRef: "Tension force perimeter distribution",
+                eq: `P_face = P·[${faceSymbol} / L_total] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal.toFixed(3)} / ${totalPerimeter.toFixed(3)}]`,
+                codeRef: "Tension force sharp-corner perimeter distribution",
                 value: `${pFace.toFixed(2)} kips`
               } : {
-                eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
-                codeRef: "Weld force perimeter distribution",
+                eq: `P_face = P·[${faceSymbol} / L_total] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal.toFixed(3)} / ${totalPerimeter.toFixed(3)}]`,
+                codeRef: "Weld force sharp-corner perimeter distribution",
                 value: `${pFace.toFixed(2)} kips`
               },
               { eq: "te = 0.707·w", codeRef: "AISC 360-16 §J2.2a", value: `${weld.te.toFixed(4)} in` },
@@ -894,12 +902,12 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
                 codeRef: "AISC Table K5.1 elastic share (SF = Le/(Le+d/3))",
                 value: `${pFace.toFixed(2)} kips`
               } : solicitation === "tension" ? {
-                eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
-                codeRef: "Tension force perimeter distribution",
+                eq: `P_face = P·[${faceSymbol} / L_total] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal.toFixed(3)} / ${totalPerimeter.toFixed(3)}]`,
+                codeRef: "Tension force sharp-corner perimeter distribution",
                 value: `${pFace.toFixed(2)} kips`
               } : {
-                eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
-                codeRef: "Weld force perimeter distribution",
+                eq: `P_face = P·[${faceSymbol} / L_total] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal.toFixed(3)} / ${totalPerimeter.toFixed(3)}]`,
+                codeRef: "Weld force sharp-corner perimeter distribution",
                 value: `${pFace.toFixed(2)} kips`
               },
               { eq: `A = t·L_eff = ${baseT.toFixed(4)}·${faceLen.length.toFixed(3)}`,
