@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import ReportMetaModal from "../modals/ReportMetaModal";
 import { renderPdf } from "../../reports/pdfRenderer";
 import { renderDocx } from "../../reports/docxRenderer";
@@ -46,7 +46,6 @@ export default function ReportActions({ reportMeta, setReportMeta, buildModel, d
       if (format === "pdf") await renderPdf(model);
       else await renderDocx(model);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error("Report export failed:", err);
       alert("Report export failed — see console for details.");
     } finally {

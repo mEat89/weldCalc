@@ -8,6 +8,9 @@ import {
   calcK5EffectiveWidth,
   calcK5LOA,
   calcFaceEffectiveLength,
+  calcSip,
+  calcMomentIpCapacity,
+  calcK5GroupCapacity,
 } from "../weldMath";
 
 describe("weldMath Unit Tests", () => {
@@ -132,7 +135,7 @@ describe("weldMath Unit Tests", () => {
   });
 
   describe("calcBaseMetal", () => {
-    it("calculates base metal yielding and rupture capacity correctly and governs yielding", () => {
+    it("shear: uses §J4.2 Eq. J4-3/J4-4 with 0.6 factor and φ=1.00/0.75", () => {
       const result = calcBaseMetal({
         baseT: 0.5,
         fy: 36,
@@ -141,6 +144,7 @@ describe("weldMath Unit Tests", () => {
         nLines: 2,
         method: "lrfd",
         appliedLoad: 50,
+        solicitation: "shear",
       });
 
       const A = 0.5 * 10 * 2;
@@ -156,6 +160,43 @@ describe("weldMath Unit Tests", () => {
       expect(result.capRupture).toBe(capRupture);
       expect(result.cap).toBe(Math.min(capYield, capRupture));
       expect(result.dcr).toBeCloseTo(50 / result.cap, 4);
+    });
+
+    it("tension: uses §J4.1 Eq. J4-1/J4-2 with NO 0.6 factor and φ=0.90/0.75", () => {
+      const result = calcBaseMetal({
+        baseT: 0.116,
+        fy: 46,
+        fu: 58,
+        length: 0.344,
+        nLines: 1,
+        method: "lrfd",
+        appliedLoad: 1.0,
+        solicitation: "tension",
+      });
+
+      const A = 0.116 * 0.344;
+      const RnYield = 46 * A;          // no 0.6 factor
+      const RnRupture = 58 * A;        // no 0.6 factor
+      const capYield = 0.90 * RnYield; // φ = 0.90 for tensile yielding
+      const capRupture = 0.75 * RnRupture;
+
+      expect(result.RnYield).toBeCloseTo(RnYield, 6);
+      expect(result.RnRupture).toBeCloseTo(RnRupture, 6);
+      expect(result.capYield).toBeCloseTo(capYield, 6);
+      expect(result.capRupture).toBeCloseTo(capRupture, 6);
+      expect(result.cap).toBeCloseTo(Math.min(capYield, capRupture), 6);
+      // Sanity: tension cap is ~1.6× bigger than the same geometry checked as shear.
+      const shearResult = calcBaseMetal({
+        baseT: 0.116, fy: 46, fu: 58, length: 0.344, nLines: 1,
+        method: "lrfd", appliedLoad: 1.0, solicitation: "shear",
+      });
+      expect(result.cap).toBeGreaterThan(shearResult.cap * 1.5);
+    });
+
+    it("defaults to shear when solicitation omitted (back-compat)", () => {
+      const a = calcBaseMetal({ baseT: 0.5, fy: 36, fu: 58, length: 10, nLines: 2, method: "lrfd", appliedLoad: 0 });
+      const b = calcBaseMetal({ baseT: 0.5, fy: 36, fu: 58, length: 10, nLines: 2, method: "lrfd", appliedLoad: 0, solicitation: "shear" });
+      expect(a.cap).toBe(b.cap);
     });
   });
 
@@ -237,39 +278,77 @@ describe("weldMath Unit Tests", () => {
     });
   });
 
-  describe("calcFaceEffectiveLength", () => {
-    it("returns cbfemLc in cbfem mode", () => {
-      const result = calcFaceEffectiveLength({
-        mode: "cbfem",
-        faceLength: 8.0,
-        isTransverse: true,
-        connType: "hss2hss",
-        cbfemLc: 5.5,
-      });
-      expect(result.length).toBe(5.5);
-      expect(result.reduced).toBe(true);
+  describe("calcSip (Eq. K5-6)", () => {
+    it("computes web + flange terms by hand for θ=90°", () => {
+      // For θ=90°, sinθ=1 → Sip = tw·[Hb²/3 + Be·Hb].
+      const Hb = 8.0;
+      const Be = 1.5;
+      const tw = 0.246; // throat for 0.348" leg
+      const expectedWeb = tw * (Hb * Hb) / 3;     // 0.246·64/3 ≈ 5.248
+      const expectedFlange = tw * Be * Hb;        // 0.246·1.5·8 = 2.952
+      const r = calcSip({ Hb, Be, tw, thetaDeg: 90 });
+      expect(r.webTerm).toBeCloseTo(expectedWeb, 4);
+      expect(r.flangeTerm).toBeCloseTo(expectedFlange, 4);
+      expect(r.Sip).toBeCloseTo(expectedWeb + expectedFlange, 4);
     });
 
-    it("throws error in cbfem mode if Lc exceeds face length", () => {
-      expect(() => {
-        calcFaceEffectiveLength({
-          mode: "cbfem",
-          faceLength: 8.0,
-          isTransverse: true,
-          connType: "hss2hss",
-          cbfemLc: 9.0,
-        });
-      }).toThrow("Lc = 9.000 in exceeds nominal face length 8 in");
+    it("scales Sip correctly for inclined branches (θ=45°)", () => {
+      const r45 = calcSip({ Hb: 6, Be: 2, tw: 0.2, thetaDeg: 45 });
+      const r90 = calcSip({ Hb: 6, Be: 2, tw: 0.2, thetaDeg: 90 });
+      // Both web and flange terms grow as θ decreases (sinθ → 0).
+      expect(r45.webTerm).toBeGreaterThan(r90.webTerm);
+      expect(r45.flangeTerm).toBeGreaterThan(r90.flangeTerm);
     });
+
+    it("throws on bad inputs", () => {
+      expect(() => calcSip({ Hb: 0, Be: 1, tw: 0.2, thetaDeg: 90 })).toThrow();
+      expect(() => calcSip({ Hb: 1, Be: 1, tw: 0.2, thetaDeg: 0 })).toThrow();
+    });
+  });
+
+  describe("calcMomentIpCapacity (Eq. K5-2)", () => {
+    it("Mn = 0.6·FEXX·Sip, φMn = 0.75·Mn under LRFD", () => {
+      const Sip = 8.2;
+      const r = calcMomentIpCapacity({ Sip, fexx: 70, method: "lrfd" });
+      expect(r.Fnw).toBeCloseTo(0.6 * 70, 6); // 42 ksi
+      expect(r.Mn).toBeCloseTo(0.6 * 70 * Sip, 4);
+      expect(r.cap).toBeCloseTo(0.75 * 0.6 * 70 * Sip, 4);
+    });
+  });
+
+  describe("calcK5GroupCapacity (Eq. K5-1 + K5-5/K5-6)", () => {
+    it("le = 2·Hb/sinθ + 2·Be at θ=90°", () => {
+      const r = calcK5GroupCapacity({
+        Hb: 8, Bb: 2, Be: 1.2, tw: 0.246, fexx: 70, thetaDeg: 90, method: "lrfd",
+      });
+      expect(r.le).toBeCloseTo(2 * 8 + 2 * 1.2, 6); // 18.4 in
+      expect(r.Pn_axial).toBeCloseTo(0.6 * 70 * 0.246 * r.le, 4);
+      expect(r.cap_axial).toBeCloseTo(0.75 * r.Pn_axial, 4);
+      expect(r.Mn_ip).toBeCloseTo(0.6 * 70 * r.Sip, 4);
+      expect(r.cap_ip).toBeCloseTo(0.75 * r.Mn_ip, 4);
+    });
+
+    it("matches calcSip terms for the same inputs", () => {
+      const sip = calcSip({ Hb: 6, Be: 2, tw: 0.2, thetaDeg: 90 });
+      const grp = calcK5GroupCapacity({
+        Hb: 6, Bb: 4, Be: 2, tw: 0.2, fexx: 70, thetaDeg: 90, method: "lrfd",
+      });
+      expect(grp.Sip).toBeCloseTo(sip.Sip, 6);
+      expect(grp.terms.webTerm).toBeCloseTo(sip.webTerm, 6);
+      expect(grp.terms.flangeTerm).toBeCloseTo(sip.flangeTerm, 6);
+    });
+  });
+
+  describe("calcFaceEffectiveLength", () => {
+    const k5Result = {
+      beRaw: 4.5,
+      be: 4.5,
+      capped: false,
+      beta: 0.5,
+      Bt: 20,
+    };
 
     it("returns k5 effective width in k5 mode for transverse faces", () => {
-      const k5Result = {
-        beRaw: 4.5,
-        be: 4.5,
-        capped: false,
-        beta: 0.5,
-        Bt: 20,
-      };
       const result = calcFaceEffectiveLength({
         mode: "k5",
         faceLength: 8.0,
@@ -279,6 +358,47 @@ describe("weldMath Unit Tests", () => {
       });
       expect(result.length).toBe(4.5);
       expect(result.reduced).toBe(true);
+      expect(result.ref).toMatch(/Eq\. K1-1/);
+    });
+
+    it("returns full nominal length for k5 mode on a longitudinal face (parallel = fully effective)", () => {
+      const result = calcFaceEffectiveLength({
+        mode: "k5",
+        faceLength: 8.0,
+        isTransverse: false,
+        connType: "hss2hss",
+        k5: k5Result,
+      });
+      expect(result.length).toBe(8.0);
+      expect(result.reduced).toBe(false);
+      expect(result.ref).toMatch(/longitudinal/i);
+    });
+
+    it("force-K5-on-longitudinal override applies Be with a conservative-judgment label", () => {
+      const result = calcFaceEffectiveLength({
+        mode: "k5",
+        faceLength: 8.0,
+        isTransverse: false,
+        connType: "hss2hss",
+        k5: k5Result,
+        forceK5OnLongitudinal: true,
+      });
+      expect(result.length).toBe(4.5);
+      expect(result.reduced).toBe(true);
+      expect(result.ref).toMatch(/Conservative engineering judgment/);
+      expect(result.ref).toMatch(/longitudinal/);
+    });
+
+    it("HSS-to-plate K5 transverse path is labeled conservative engineering judgment", () => {
+      const result = calcFaceEffectiveLength({
+        mode: "k5",
+        faceLength: 8.0,
+        isTransverse: true,
+        connType: "hss2plate",
+        k5: k5Result,
+      });
+      expect(result.length).toBe(4.5);
+      expect(result.ref).toMatch(/Conservative engineering judgment/);
     });
 
     it("returns full nominal length in aisc mode representing a rigid base", () => {

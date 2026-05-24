@@ -1,6 +1,77 @@
+/* eslint-disable react-refresh/only-export-components */
 import React from "react";
 import { toFraction, to16ths } from "../../math/weldMath";
 import { COMMON_PLATE_T, LOAD_CASES, HSS_SHAPES, STEEL_GRADES } from "../../constants/steelData";
+
+/**
+ * Parse a user-entered numeric string. Empty / NaN → 0. Negative values are
+ * surfaced to callers so they can render a visible warning (we coerce to 0
+ * for the actual calculation but the raw value is preserved on the field).
+ */
+export function parseNonNegative(v) {
+  const parsed = parseFloat(v);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, parsed);
+}
+
+/**
+ * Numeric input that enforces non-negativity for engineering demand values
+ * (loads, moments). Renders a visible inline warning when the user types a
+ * negative number — the calculation receives 0 instead of silently treating
+ * the negative as a sign flip.
+ */
+export function NonNegativeNumberInput({
+  id,
+  value,
+  onChange,
+  step = "any",
+  placeholder,
+  className = "form-input compact",
+  style,
+  disabled = false,
+  title,
+}) {
+  const [rawDisplay, setRawDisplay] = React.useState(String(value ?? 0));
+  React.useEffect(() => {
+    // Re-sync the displayed text only when the external value is NOT what
+    // parseNonNegative would produce from the current raw text. This lets the
+    // user keep "-5" visible (with the warning) while the coerced value (0)
+    // flows into the calculation underneath — without overwriting the user's
+    // raw input on every onChange round-trip.
+    const coerced = parseNonNegative(rawDisplay);
+    if (coerced !== value) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setRawDisplay(String(value ?? 0));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  const parsed = parseFloat(rawDisplay);
+  const isNegative = Number.isFinite(parsed) && parsed < 0;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "2px", ...style }}>
+      <input
+        id={id}
+        type="number"
+        step={step}
+        value={rawDisplay}
+        placeholder={placeholder}
+        disabled={disabled}
+        title={title}
+        onChange={(e) => {
+          if (disabled) return;
+          setRawDisplay(e.target.value);
+          onChange(parseNonNegative(e.target.value));
+        }}
+        className={className}
+      />
+      {isNegative && (
+        <span style={{ color: "var(--danger)", fontSize: "10.5px", lineHeight: "1.2" }}>
+          ⚠ Negative input ignored — using 0. Enter the magnitude; sign is determined by solicitation type.
+        </span>
+      )}
+    </div>
+  );
+}
 
 /**
  * Standard wrapper for labels, inputs, and descriptions

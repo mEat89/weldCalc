@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import HSSTab from "./components/tabs/HSSTab";
 import StandardShapesTab from "./components/tabs/StandardShapesTab";
 import PlateRigidityTab from "./components/tabs/PlateRigidityTab";
@@ -23,13 +23,18 @@ export default function App() {
     date: new Date().toISOString().slice(0, 10),
   });
 
-  // Global Dark Mode state
+  // Global Dark Mode state. localStorage can throw in Safari private mode
+  // and under strict cookie/storage policies — fall back to system preference
+  // on read failure and swallow write failures with a console.warn.
   const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem("weld_calc_dark_mode");
-    if (saved !== null) {
-      return saved === "true";
+    try {
+      const saved = localStorage.getItem("weld_calc_dark_mode");
+      if (saved !== null) {
+        return saved === "true";
+      }
+    } catch (err) {
+      console.warn("localStorage unavailable for dark-mode preference; falling back to system preference.", err);
     }
-    // Fallback to system preference
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
 
@@ -39,7 +44,11 @@ export default function App() {
     } else {
       document.documentElement.removeAttribute("data-theme");
     }
-    localStorage.setItem("weld_calc_dark_mode", String(darkMode));
+    try {
+      localStorage.setItem("weld_calc_dark_mode", String(darkMode));
+    } catch (err) {
+      console.warn("Failed to persist dark-mode preference to localStorage; will not survive reload.", err);
+    }
   }, [darkMode]);
 
   const toggleDarkMode = () => setDarkMode(prev => !prev);

@@ -605,6 +605,7 @@ input[type=number] {
   gap: 4px;
   line-height: 1.25;
   width: 100%;
+  min-width: 0;
 }
 
 .trace-row::after {
@@ -620,9 +621,15 @@ input[type=number] {
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 10px;
   color: var(--text-main);
-  white-space: nowrap;
+  /* Allow long equations (e.g. Sip extreme-fiber moment apportioning) to wrap
+     so they don't force the column wider than the card and clip the right-hand
+     stat-card / OK-NG panel. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   order: 1;
-  flex-shrink: 0;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .trace-val {

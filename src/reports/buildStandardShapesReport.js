@@ -9,7 +9,7 @@ import { toFraction, to16ths } from "../math/weldMath";
  */
 export function buildStandardShapesReport({ state, calcs, meta, diagramSvgString }) {
   const {
-    shape, loadCase, legSize, length, nLines, angleDeg, fexx, appliedLoad,
+    shape, loadCase, legSize, length, nLines, fexx, appliedLoad,
     useDirectional, memberT, memberGrade, plateT, plateGrade,
   } = state;
   const {

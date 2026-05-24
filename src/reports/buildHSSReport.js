@@ -1,36 +1,67 @@
 import { toFraction, to16ths } from "../math/weldMath";
 
 /**
+ * Boundary validator for the report builder.
+ *
+ * Hard-fails if the tab passes a malformed `calcs` payload. Keeps the PDF
+ * from silently rendering `undefined` cells when an upstream refactor forgets
+ * to wire a field.
+ */
+function assertReportInputs({ state, calcs }) {
+  if (!state || typeof state !== "object") {
+    throw new Error("buildHSSReport: `state` is missing or not an object.");
+  }
+  if (!calcs || typeof calcs !== "object") {
+    throw new Error("buildHSSReport: `calcs` is missing or not an object.");
+  }
+  const requiredStateKeys = [
+    "connType", "lengthMode",
+    "branch", "branchGrade", "chord", "chordGrade",
+    "branchTransverseDim", "legSize", "fexx",
+    "appliedShear", "appliedTension", "appliedMip",
+  ];
+  const missingState = requiredStateKeys.filter((k) => state[k] === undefined);
+  if (missingState.length > 0) {
+    throw new Error(`buildHSSReport: state missing required key(s): ${missingState.join(", ")}`);
+  }
+  if (!calcs.shared) {
+    throw new Error("buildHSSReport: calcs.shared is required.");
+  }
+}
+
+/**
  * Build the report model for the HSS Connections tab.
  *
- * The HSS tab dispatches the effective-length trace through a complex
- * branch/mode-aware IIFE, so the tab itself passes the already-assembled
- * effective-length check object via `calcs.effLenBlock`.
+ * Layout mirrors the new UI:
+ *   1. Inputs (connection, materials, weld parameters, applied loads)
+ *   2. Final §K4-9 design verdict (auto-aggregated from current loads)
+ *   3. Group effective length trace + weld size limits
+ *   4. One group-capacity block per non-zero global load
  */
 export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
+  assertReportInputs({ state, calcs });
   const {
-    connType, lengthMode, solicitation,
+    connType, lengthMode,
     branch, branchGrade, chord, chordGrade,
     plateT, plateGrade,
-    branchTransverseDim, selectedFaceDim,
-    loadCase, angleDeg, legSize, fexx,
-    appliedLoad, appliedMoment, pFace, useDirectional, overrideLength, customLength,
+    branchTransverseDim, legSize, fexx,
+    appliedShear, appliedTension, appliedMip,
   } = state;
+  const { shared, shear, tension, ipMoment, k4Unity } = calcs;
   const {
-    weld, base, size, governing, faceLen, k5, loa, dCouple,
+    size, loa,
     effLenBlock,
-    fnwEq, fnwRef, designEq, designRef,
     baseT, baseFy, baseFu, baseLabel, baseTNominal,
-    thetaDeg, effectiveUseDirectional, lockDirectional, lockReason,
-    selectedFaceNominal, faceDescription,
-  } = calcs;
+    thetaDeg,
+    transverseLen, parallelLen, groupCap,
+  } = shared;
 
+  // ----- INPUTS -----
   const inputs = [
     {
       group: "Connection geometry",
       rows: [
         { label: "Connection type", value: connType === "hss2hss" ? "HSS-to-HSS" : "HSS-to-Plate" },
-        { label: "Solicitation type", value: solicitation === "shear" ? "Shear (In-Plane)" : solicitation === "tension" ? "Tension (Out-of-Plane)" : "Moment (In-Plane Flexure)" },
         { label: "Branch HSS", value: branch.name,
           extra: `B = ${branch.B}", H = ${branch.H}", t_des = ${branch.tDes.toFixed(4)}"` },
         ...(connType === "hss2hss" ? [
@@ -39,10 +70,9 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
         ] : [
           { label: "Plate thickness, tp", value: toFraction(plateT) },
         ]),
-        { label: "Branch transverse dim", value: branchTransverseDim },
-        { label: "Selected face", value: selectedFaceDim, extra: faceDescription || "" },
+        { label: "Group orientation", value: `${branchTransverseDim} dimension transverse to support axis`,
+          extra: `Bb = ${transverseLen.toFixed(3)} in, Hb = ${parallelLen.toFixed(3)} in` },
         { label: "Effective length method", value: lengthMode === "k5" ? "K5 effective width" : "AISC nominal" },
-        ...(overrideLength ? [{ label: "Length override", value: `${customLength}"` }] : []),
       ],
     },
     {
@@ -66,55 +96,56 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
       rows: [
         { label: "Leg size, w", value: toFraction(legSize), extra: to16ths(legSize) },
         { label: "Electrode", value: `E${fexx}` },
-        { label: "Load case", value: solicitation === "shear" ? loadCase : solicitation, extra: `θ = ${thetaDeg}°` },
-        { label: "Directional increase",
-          value: effectiveUseDirectional ? "Allowed (1.5×)" : "Suppressed",
-          extra: lockDirectional ? `Locked: ${lockReason}` : (useDirectional ? "" : "Manually suppressed") },
+        { label: "HSS group kds", value: "1.0 (no directional selector)" },
+        { label: "Branch angle, θ", value: `${thetaDeg}°` },
       ],
     },
     {
       group: "Applied loads",
-      rows: solicitation === "moment" ? [
-        { label: "Bending moment, M_u", value: appliedMoment > 0 ? `${appliedMoment.toFixed(2)} ft-kips` : "0 (no demand)" },
-        { label: "Couple arm, d_couple", value: `${dCouple?.toFixed(2) ?? "—"} in` },
-        { label: "Moment share factor", value: faceLen ? `${(faceLen.length / (faceLen.length + dCouple / 3) * 100).toFixed(1)}%` : "—" },
-        { label: "Demand on face, P_face", value: pFace > 0 ? `${pFace.toFixed(2)} kips` : "0 (no demand)" },
-      ] : [
-        { label: "Total branch load, P_total", value: appliedLoad > 0 ? `${appliedLoad.toFixed(2)} kips` : "0 (no demand)" },
-        { label: "Face share factor", value: `${(selectedFaceNominal / (2 * branch.B + 2 * (branch.H - 2 * branch.tDes)) * 100).toFixed(1)}%` },
-        { label: "Demand on face, P_face", value: pFace > 0 ? `${pFace.toFixed(2)} kips` : "0 (no demand)" },
+      rows: [
+        { label: "Shear, V_u",            value: appliedShear   > 0 ? `${appliedShear.toFixed(2)} kips`    : "0 (no demand)" },
+        { label: "Tension, N_u",          value: appliedTension > 0 ? `${appliedTension.toFixed(2)} kips`  : "0 (no demand)" },
+        { label: connType === "hss2plate" ? "Bending moment, M_u" : "In-plane moment, M_ip", value: appliedMip > 0 ? `${appliedMip.toFixed(2)} ft-kips` : "0 (no demand)" },
       ],
     },
   ];
 
+  // ----- TOP-LEVEL RESULT BULLETS -----
   const results = [];
-  if (faceLen) results.push({
-    label: `Effective length on selected face (${selectedFaceDim})`,
-    value: `L_eff = ${faceLen.length.toFixed(3)} in (nominal ${selectedFaceNominal} in)`,
+  if (groupCap) results.push({
+    label: "Effective weld-group length",
+    value: `le = ${groupCap.le.toFixed(3)} in (Be = ${shared.Be_for_sip.toFixed(3)} in)`,
   });
-  if (weld) results.push({
-    label: solicitation === "shear" ? "Weld metal (§J2.4)" : "Weld metal tension (§J2.4)",
-    value: `φRn = ${weld.cap.toFixed(2)} kips, DCR = ${weld.dcr !== null ? weld.dcr.toFixed(3) : "—"}`,
-    status: weld.status ? (weld.status === "OK" ? "pass" : "fail") : undefined,
-  });
-  if (base) results.push({
-    label: solicitation === "shear" ? `Base metal — ${baseLabel} (§J4.2)` : `Base metal tension — ${baseLabel} (§J4.2)`,
-    value: `φRn = ${base.cap.toFixed(2)} kips, DCR = ${base.dcr !== null ? base.dcr.toFixed(3) : "—"}`,
-    status: base.status ? (base.status === "OK" ? "pass" : "fail") : undefined,
-  });
+  for (const [sol, label, unit] of [
+    [shear, "Shear (V)", "kips"],
+    [tension, "Tension (N)", "kips"],
+    [ipMoment, connType === "hss2plate" ? "Bending moment (M)" : "In-plane moment (M_ip)", "kip-in"],
+  ]) {
+    if (sol && sol.controlling) {
+      results.push({
+        label: `Group check — ${label}: ${sol.controlling.which}`,
+        value: `φ capacity = ${sol.controlling.cap.toFixed(2)} ${unit}, DCR = ${sol.controlling.dcr !== null ? sol.controlling.dcr.toFixed(3) : "—"}`,
+        status: sol.controlling.status === "OK" ? "pass" : "fail",
+      });
+    }
+  }
   if (size) results.push({
     label: "Weld size limits (§J2.2b, Table J2.4)",
     value: `min ${size.minLabel} ≤ w = ${toFraction(legSize)} ≤ max ${size.maxLabel}`,
     status: size.status === "OK" ? "pass" : "fail",
   });
-  if (governing && governing.status) results.push({
-    label: `Governing strength check — ${governing.which}`,
-    value: `φRn = ${governing.cap.toFixed(2)} kips, DCR = ${governing.dcr.toFixed(3)}`,
-    status: governing.status === "OK" ? "pass" : "fail",
-  });
+  if (k4Unity && k4Unity.hasAnyTerm) {
+    results.push({
+      label: "Combined loading §K4-9 (auto-aggregated)",
+      value: `Unity = ${k4Unity.unity.toFixed(3)} ≤ 1.000 → ${k4Unity.status}`,
+      status: k4Unity.status === "OK" ? "pass" : "fail",
+    });
+  }
 
+  // ----- CHECK BLOCKS -----
   const checks = [];
 
+  // Effective length (once)
   if (effLenBlock) {
     checks.push({
       title: effLenBlock.title,
@@ -125,107 +156,15 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
     });
   }
 
-  if (weld && faceLen) {
-    const faceSymbol = selectedFaceDim === "B" ? "B_b" : "H_b";
-    const L_eff = faceLen ? faceLen.length : selectedFaceNominal;
-    const pFaceStep = solicitation === "moment" ? {
-      eq: `P_face = [M·12 / d_couple] · [L_eff / (L_eff + d_couple/3)] = [${appliedMoment.toFixed(2)}·12 / ${dCouple.toFixed(2)}] · [${L_eff.toFixed(3)} / (${L_eff.toFixed(3)} + ${(dCouple/3).toFixed(3)})]`,
-      codeRef: "AISC Table K5.1 elastic moment share distribution", value: `${pFace.toFixed(2)} kips`
-    } : solicitation === "tension" ? {
-      eq: `P_face = P·[${faceSymbol} / L_total] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal.toFixed(3)} / ${(2 * branch.B + 2 * (branch.H - 2 * branch.tDes)).toFixed(3)}]`,
-      codeRef: "Tension force sharp-corner perimeter distribution", value: `${pFace.toFixed(2)} kips`
-    } : {
-      eq: `P_face = P·[${faceSymbol} / L_total] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal.toFixed(3)} / ${(2 * branch.B + 2 * (branch.H - 2 * branch.tDes)).toFixed(3)}]`,
-      codeRef: "Weld force sharp-corner perimeter distribution", value: `${pFace.toFixed(2)} kips`
-    };
-
-    const steps = [
-      pFaceStep,
-      { eq: "te = 0.707·w", codeRef: "AISC 360-16 §J2.2a", value: `${weld.te.toFixed(4)} in` },
-      { eq: `Awe = te·L_eff = ${weld.te.toFixed(4)}·${faceLen.length.toFixed(3)}`,
-        codeRef: "AISC 360-16 §J2.4 effective area", value: `${weld.Awe.toFixed(3)} in²` },
-      { eq: fnwEq, codeRef: fnwRef, value: `${weld.Fnw.toFixed(2)} ksi` },
-    ];
-    if (weld.beta < 1.0) {
-      steps.push(
-        { eq: "β = 1.2 − 0.002·(L/w)",
-          codeRef: `AISC §J2.2b Eq. J2-1 long weld reduction (L/w = ${(faceLen.length / legSize).toFixed(1)} > 100)`,
-          value: weld.beta.toFixed(3) },
-        { eq: "Rn = β·Fnw·Awe", codeRef: "AISC 360-16 §J2.4 nominal capacity (reduced)", value: `${weld.Rn.toFixed(2)} kips` }
-      );
-    } else {
-      steps.push({ eq: "Rn = Fnw·Awe", codeRef: "AISC 360-16 §J2.4 nominal capacity", value: `${weld.Rn.toFixed(2)} kips` });
-    }
-    steps.push({ eq: designEq, codeRef: designRef, value: `${weld.cap.toFixed(2)} kips` });
-
-    checks.push({
-      title: solicitation === "shear" ? "Check 1 — Weld metal shear rupture" : "Check 1 — Weld metal tension rupture",
-      codeRef: "AISC 360-16 §J2.4",
-      steps,
-      statCards: [
-        { label: "Nominal Rn", value: `${weld.Rn.toFixed(2)} kips` },
-        { label: "φRn (LRFD)", value: `${weld.cap.toFixed(2)} kips` },
-        { label: "DCR", value: weld.dcr !== null ? weld.dcr.toFixed(3) : "—" },
-      ],
-      verdict: weld.status ? {
-        status: weld.status, demand: pFace, cap: weld.cap, dcr: weld.dcr,
-        label: weld.status === "OK" ? (solicitation === "shear" ? "Weld metal adequate" : "Weld metal tension adequate") : (solicitation === "shear" ? "Weld metal inadequate" : "Weld metal tension inadequate"),
-      } : { status: null, demand: 0, cap: weld.cap, dcr: null, label: "No demand entered" },
-    });
-  }
-
-  if (base && faceLen) {
-    const faceSymbol = selectedFaceDim === "B" ? "B_b" : "H_b";
-    const L_eff = faceLen ? faceLen.length : selectedFaceNominal;
-    const pFaceStep = solicitation === "moment" ? {
-      eq: `P_face = [M·12 / d_couple] · [L_eff / (L_eff + d_couple/3)] = [${appliedMoment.toFixed(2)}·12 / ${dCouple.toFixed(2)}] · [${L_eff.toFixed(3)} / (${L_eff.toFixed(3)} + ${(dCouple/3).toFixed(3)})]`,
-      codeRef: "AISC Table K5.1 elastic moment share distribution", value: `${pFace.toFixed(2)} kips`
-    } : solicitation === "tension" ? {
-      eq: `P_face = P·[${faceSymbol} / L_total] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal.toFixed(3)} / ${(2 * branch.B + 2 * (branch.H - 2 * branch.tDes)).toFixed(3)}]`,
-      codeRef: "Tension force sharp-corner perimeter distribution", value: `${pFace.toFixed(2)} kips`
-    } : {
-      eq: `P_face = P·[${faceSymbol} / L_total] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal.toFixed(3)} / ${(2 * branch.B + 2 * (branch.H - 2 * branch.tDes)).toFixed(3)}]`,
-      codeRef: "Weld force sharp-corner perimeter distribution", value: `${pFace.toFixed(2)} kips`
-    };
-
-    checks.push({
-      title: solicitation === "shear" ? `Check 2 — Base metal shear (${baseLabel})` : `Check 2 — Base metal tension (${baseLabel})`,
-      codeRef: "AISC 360-16 §J4.2",
-      steps: [
-        pFaceStep,
-        { eq: `A = t·L_eff = ${baseT.toFixed(4)}·${faceLen.length.toFixed(3)}`,
-          codeRef: solicitation === "shear" ? "AISC 360-16 base shear critical area" : "AISC 360-16 base critical area", value: `${base.A.toFixed(3)} in²` },
-        { eq: `Yielding: Rn = 0.60·Fy·A = 0.60·${baseFy}·${base.A.toFixed(3)}`,
-          codeRef: "AISC 360-16 Eq. J4-3", value: `${base.RnYield.toFixed(2)} kips` },
-        { eq: "φRn (yield) = 1.00·Rn", codeRef: "φ = 1.00", value: `${base.capYield.toFixed(2)} kips` },
-        { eq: `Rupture: Rn = 0.60·Fu·A = 0.60·${baseFu}·${base.A.toFixed(3)}`,
-          codeRef: "AISC 360-16 Eq. J4-4", value: `${base.RnRupture.toFixed(2)} kips` },
-        { eq: "φRn (rupture) = 0.75·Rn", codeRef: "φ = 0.75", value: `${base.capRupture.toFixed(2)} kips` },
-        { eq: `Governing: ${base.governs} (lower limit)`,
-          codeRef: "min(yield cap, rupture cap)", value: `${base.cap.toFixed(2)} kips` },
-      ],
-      statCards: [
-        { label: `${baseLabel} Fy / Fu`, value: `${baseFy}/${baseFu} ksi` },
-        { label: `Governs: ${base.governs}`, value: `${base.cap.toFixed(2)} kips` },
-        { label: "DCR", value: base.dcr !== null ? base.dcr.toFixed(3) : "—" },
-      ],
-      verdict: base.status ? {
-        status: base.status, demand: pFace, cap: base.cap, dcr: base.dcr,
-        label: base.status === "OK" ? "Base metal adequate" : "Base metal inadequate",
-      } : { status: null, demand: 0, cap: base.cap, dcr: null, label: "No demand entered" },
-    });
-  }
-
+  // Check 3 — weld size limits (shared)
   if (size) {
     checks.push({
       title: "Check 3 — Weld size limits",
       codeRef: "AISC 360-16 §J2.2b, Table J2.4",
       steps: [
         { eq: `Provided: w = ${toFraction(legSize)}`, codeRef: "User selected leg size", value: to16ths(legSize) },
-        { eq: `w ≥ w_min (min = ${size.minLabel})`,
-          codeRef: `AISC Table J2.4 (t_nom = ${toFraction(baseTNominal)})`, value: size.minOk ? "OK" : "NG" },
-        { eq: `w ≤ w_max (max = ${size.maxLabel})`,
-          codeRef: `AISC §J2.2b (t_nom = ${toFraction(baseTNominal)})`, value: size.maxOk ? "OK" : "NG" },
+        { eq: `w ≥ w_min (min = ${size.minLabel})`, codeRef: `AISC Table J2.4 (t_nom = ${toFraction(baseTNominal)})`, value: size.minOk ? "OK" : "NG" },
+        { eq: `w ≤ w_max (max = ${size.maxLabel})`, codeRef: `AISC §J2.2b (t_nom = ${toFraction(baseTNominal)})`, value: size.maxOk ? "OK" : "NG" },
       ],
       statCards: [
         { label: "Min weld size", value: toFraction(size.minSize) },
@@ -234,31 +173,105 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
       ],
       verdict: {
         status: size.status, demand: 0, cap: 0, dcr: null,
-        label: size.status === "OK"
-          ? "Weld size within limits"
-          : (!size.minOk ? "Below minimum size limit" : "Exceeds maximum allowable size"),
+        label: size.status === "OK" ? "Weld size within limits" : (!size.minOk ? "Below minimum size limit" : "Exceeds maximum allowable size"),
       },
     });
   }
 
+  // Group solicitation block emitter
+  function emitForSolicitation(result, solLabel) {
+    if (!result) return;
+    const { solicitation, load } = result;
+    const isMoment = solicitation === "moment";
+    if (groupCap) {
+      const Pu_or_Mu_kip = isMoment ? load * 12 : load;
+      const cap = isMoment ? groupCap.cap_ip : groupCap.cap_axial;
+      const nominal = isMoment ? groupCap.Mn_ip : groupCap.Pn_axial;
+      const dcr = Pu_or_Mu_kip > 0 && cap > 0 ? Pu_or_Mu_kip / cap : null;
+      const statusG = dcr === null ? null : dcr <= 1.0 ? "OK" : "NG";
+      checks.push({
+        title: isMoment
+          ? `${solLabel} — Total group capacity, in-plane moment (§K5-2 / K5-6)`
+          : `${solLabel} — Total group capacity, axial (§K5-1 / K5-5)`,
+        codeRef: isMoment
+          ? "AISC 360-22 §K5 Eq. K5-2: Mn-ip = Fnw · Sip ; Eq. K5-6"
+          : "AISC 360-22 §K5 Eq. K5-1: Pn = Fnw · tw · le ; Eq. K5-5",
+        steps: isMoment ? [
+          { eq: `Sip = tw·[Hb²/(3·sin²θ) + Be·Hb/sinθ]`, codeRef: "AISC §K5 Eq. K5-6 (effective elastic section modulus)", value: `${groupCap.Sip.toFixed(4)} in³` },
+          { eq: `  webTerm = tw·Hb²/(3·sin²θ)`, codeRef: "Both webs (parallel longitudinal welds)", value: `${groupCap.terms.webTerm.toFixed(4)} in³` },
+          { eq: `  flangeTerm = tw·Be·Hb/sinθ`, codeRef: "Both flanges (transverse welds with Be effective width)", value: `${groupCap.terms.flangeTerm.toFixed(4)} in³` },
+          { eq: `Fnw = 0.60·FEXX = 0.60·${fexx}`, codeRef: "AISC §K5: kds = 1.0 for HSS branch welds", value: `${groupCap.Fnw.toFixed(2)} ksi` },
+          { eq: `Mn-ip = Fnw · Sip`, codeRef: "AISC §K5 Eq. K5-2", value: `${groupCap.Mn_ip.toFixed(2)} kip-in` },
+          { eq: `φMn-ip = 0.75 · Mn-ip`, codeRef: "LRFD φ = 0.75 per §K5(a)", value: `${groupCap.cap_ip.toFixed(2)} kip-in` },
+        ] : [
+          { eq: `le = 2·Hb/sinθ + 2·Be`, codeRef: "AISC §K5 Eq. K5-5 (total effective weld length around perimeter)", value: `${groupCap.le.toFixed(3)} in` },
+          { eq: `Fnw = 0.60·FEXX = 0.60·${fexx}`, codeRef: "AISC §K5: kds = 1.0 for HSS branch welds", value: `${groupCap.Fnw.toFixed(2)} ksi` },
+          { eq: `Pn = Fnw · tw · le`, codeRef: "AISC §K5 Eq. K5-1", value: `${groupCap.Pn_axial.toFixed(2)} kips` },
+          { eq: `φPn = 0.75 · Pn`, codeRef: "LRFD φ = 0.75 per §K5(a)", value: `${groupCap.cap_axial.toFixed(2)} kips` },
+        ],
+        statCards: isMoment ? [
+          { label: "Mn-ip nominal", value: `${nominal.toFixed(2)} kip-in` },
+          { label: "φMn-ip (LRFD)", value: `${cap.toFixed(2)} kip-in` },
+          { label: "Group DCR", value: dcr !== null ? dcr.toFixed(3) : "—" },
+        ] : [
+          { label: "Pn nominal", value: `${nominal.toFixed(2)} kips` },
+          { label: "φPn (LRFD)", value: `${cap.toFixed(2)} kips` },
+          { label: "Group DCR", value: dcr !== null ? dcr.toFixed(3) : "—" },
+        ],
+        verdict: statusG ? {
+          status: statusG, demand: Pu_or_Mu_kip, cap, dcr,
+          label: statusG === "OK" ? "Total group capacity adequate — matches Hilti CBFEM headline %" : "Total group capacity exceeded",
+        } : { status: null, demand: 0, cap, dcr: null, label: "No demand entered" },
+      });
+    }
+  }
+
+  emitForSolicitation(shear,    "Shear (V)");
+  emitForSolicitation(tension,  "Tension (N)");
+  emitForSolicitation(ipMoment, connType === "hss2plate" ? "Bending moment (M)" : "In-plane moment (M_ip)");
+
+  // ----- Final §K4-9 unity (auto-aggregated) -----
+  if (k4Unity && k4Unity.hasAnyTerm) {
+    checks.push({
+      title: "Final design verdict — Combined loading (§K4-9)",
+      codeRef: "AISC 360-22 §K4 — Pr/Pc + Mr,ip/Mc,ip ≤ 1.0 (auto-aggregated)",
+      steps: [
+        { eq: "Axial / shear term: Pr/Pc", codeRef: "Worse active group DCR from current shear/tension inputs", value: k4Unity.terms.axial.toFixed(3) },
+        { eq: "In-plane moment term: Mr,ip/Mc,ip", codeRef: "Current in-plane moment group DCR (Mu·12 / φMn-ip)", value: k4Unity.terms.ipMoment.toFixed(3) },
+        { eq: "Unity = Σ terms", codeRef: "AISC §K4-9 interaction equation (≤ 1.0)", value: k4Unity.unity.toFixed(3) },
+      ],
+      statCards: [
+        { label: "Unity sum", value: k4Unity.unity.toFixed(3) },
+        { label: "Limit", value: "1.000" },
+        { label: "Margin", value: (1.0 - k4Unity.unity).toFixed(3) },
+      ],
+      verdict: {
+        status: k4Unity.status, demand: k4Unity.unity, cap: 1.0, dcr: k4Unity.unity,
+        label: k4Unity.status === "OK" ? "Final connection check adequate" : "Final connection check exceeds unity (§K4-9)",
+      },
+    });
+  }
+
+  // ----- Warnings + references -----
   const warnings = [];
   if (loa && loa.withinLOA === false && Array.isArray(loa.violations)) {
     for (const v of loa.violations) warnings.push(`LOA: ${v}`);
   }
 
   const references = [
-    "AISC 360-22 §J2.4 — Fillet weld strength; Eq. J2-5 directional strength increase.",
+    "AISC 360-22 §J2.4 — Fillet weld strength.",
     "AISC 360-22 §J2.2b — Fillet weld size limits and long-weld reduction (Eq. J2-1).",
-    "AISC 360-22 §J4.2 — Shear strength of connecting elements: yielding (Eq. J4-3) and rupture (Eq. J4-4).",
-    "AISC 360-22 §K5 — HSS-to-HSS connections; effective width Be (Eq. K1-1, Table K5.1).",
-    "AISC 360-22 §K5 commentary — kds = 1.0 for HSS branch welds (non-uniform chord-wall stiffness).",
+    "AISC 360-22 §J4.1 — Tensile strength of connecting elements: yielding (J4-1) and rupture (J4-2).",
+    "AISC 360-22 §J4.2 — Shear strength of connecting elements: yielding (J4-3) and rupture (J4-4).",
+    "AISC 360-22 §K5 — HSS-to-HSS connections; Be (Eq. K1-1), le (Eq. K5-5), Sip (Eq. K5-6), Pn (K5-1), Mn-ip (K5-2).",
+    "AISC 360-22 §K4 — Interaction Eq. K4-9 (auto-aggregated here).",
     "AISC 360-22 Table J2.4 — Minimum fillet weld size based on connected part thickness.",
   ];
   const notes = [
-    "LRFD basis. The governing check is the minimum of weld-metal and base-metal capacities for the selected face only.",
-    "For HSS-to-HSS connections, the directional strength increase (Eq. J2-5) is suppressed per §K5 commentary.",
-    "K5 effective width (Be) reduces the weld length on the transverse face when the branch is narrower than the chord.",
-    "Limits-of-applicability (LOA) flags are advisory; review the connection geometry against §K5 Table K5.1 limits.",
+    "LRFD basis. Each non-zero load runs one total weld-group capacity check; the final §K4-9 verdict aggregates active group DCRs automatically.",
+    "kds = 1.0 (no directional selector) is locked for this HSS group workflow per §K5 commentary / Table K5.1 user notes.",
+    "K5 effective width (Be) reduces the transverse group width used by the total weld group when K5 mode is selected.",
+    "For HSS-to-plate, V, N, and M are interpreted as resultants at the weld group, not member-span end loads. Moment demand is treated as flexural weld-group bending; torsion about the HSS longitudinal axis is not checked.",
   ];
 
   return {

@@ -1,5 +1,3 @@
-import React from "react";
-
 // Centralized definition of every symbol used in the calculator, strictly LRFD aligned
 const LEGEND_DATA = [
   {
@@ -9,7 +7,7 @@ const LEGEND_DATA = [
       ["hss2hss",   "—",   "HSS branch member welded to an HSS chord member (truss connection)"],
       ["hss2plate", "—",   "HSS member welded to a plate (e.g., baseplate, cap plate)"],
       ["AISC mode", "—",   "Strict AISC 360 compliance — full nominal length for hss2plate, K5 Be on transverse hss2hss face"],
-      ["K5 Be mode","—",   "Apply AISC §K5 Eq. K1-1 effective-width reduction to transverse face for BOTH connection types (extended engineering judgment for hss2plate)"],
+      ["K5 Be mode","—",   "Apply Eq. K1-1 Be reduction to the transverse branch face. In-scope §K5 for hss2hss; conservative engineering judgment for hss2plate (plate treated as chord). Longitudinal faces stay fully effective per Table K5.1 unless force-K5 override is enabled."],
     ],
   },
   {
@@ -71,15 +69,14 @@ const LEGEND_DATA = [
     rows: [
       ["w",        "in.",   "Fillet weld nominal leg size (equal-leg weld assumed)"],
       ["te",       "in.",   "Effective throat thickness = 0.707·w"],
-      ["L",        "in.",   "Nominal geometric weld line length along the selected face"],
-      ["L_eff",    "in.",   "Effective weld length used for strength — nominal length or reduced Be based on face flexibility"],
-      ["Be (He)",  "in.",   "K5 reduced out-of-plane effective width of the branch face (AISC 360 Eq. K1-1)"],
-      ["P_face",   "kip",   "Apportioned ultimate force demand on the checked face (either perimeter share or resolved moment share)"],
-      ["SF",       "—",     "Moment Share Factor = Leff / (Leff + d_couple/3), elastically distributing flexural loads between flanges and webs"],
-      ["d_couple", "in.",   "Bending moment couple force arm branch depth Hb or width Bb perpendicular to checked face"],
-      ["Aw",       "in²",   "Effective weld shear area = te × L_eff"],
-      ["Θ (theta)","°",     "Angle of loading measured from weld longitudinal axis (0° = parallel, 90° = perpendicular)"],
-      ["kds",      "—",     "Directional factor = 1.0 + 0.5·sin¹.⁵(Θ); locked to 1.0 for HSS branch perimeter welds per §K5 commentary"],
+      ["le",       "in.",   "Total effective weld-group length per AISC §K5 Eq. K5-5"],
+      ["Hb",       "in.",   "Branch dimension along the longitudinal welds in the group equations"],
+      ["Bb",       "in.",   "Branch transverse width used to compute Be"],
+      ["Be",       "in.",   "K5 reduced effective transverse group width (AISC 360 Eq. K1-1)"],
+      ["Sip",      "in³",   "Effective elastic section modulus for in-plane moment per AISC §K5 Eq. K5-6"],
+      ["tw",       "in.",   "Effective weld throat thickness = 0.707·w"],
+      ["Θ (theta)","°",     "Branch-to-support angle used by §K5 group equations; current HSS workflow uses θ = 90°"],
+      ["kds",      "—",     "Directional factor; locked to 1.0 for the HSS group weld workflow per §K5 commentary"],
       ["Fnw",      "ksi",   "Nominal weld shear stress = 0.60·FEXX·kds (AISC Eq. J2-5)"],
       ["w_min",    "in.",   "Minimum fillet weld size per Table J2.4 (prevents weld rapid cooling cracks)"],
       ["w_max",    "in.",   "Maximum fillet weld size along plate edge = t − 1/16 in. (for parts t ≥ 1/4 in.)"],

@@ -41,13 +41,6 @@ function p(text, opts = {}) {
   });
 }
 
-function pMixed(runs, opts = {}) {
-  return new Paragraph({
-    spacing: opts.spacing || { before: 60, after: 60 },
-    children: runs,
-  });
-}
-
 function heading(text, level = 2) {
   return new Paragraph({
     heading: level === 1 ? HeadingLevel.HEADING_1 : (level === 2 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_3),
@@ -228,7 +221,6 @@ export async function renderDocx(model) {
         children: [new ImageRun({ data: bytes, transformation: { width: drawW, height: drawH } })],
       }));
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn("Diagram capture failed:", err);
     }
   }

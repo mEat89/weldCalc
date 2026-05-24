@@ -1,5 +1,3 @@
-import React from "react";
-
 export default function ReferencesModal({ onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -33,32 +31,40 @@ export default function ReferencesModal({ onClose }) {
                 </h4>
                 <ul style={{ paddingLeft: "20px", display: "flex", flexDirection: "column", gap: "6px", margin: 0 }}>
                   <li>
-                    <strong>Weld Force Perimeter Distribution (Tension &amp; Shear):</strong> Under global branch axial tension or shear (Pu), the load is elastically distributed over the entire branch weld perimeter (L_total = 2·B_b + 2·(H_b - 2·t_des)) using a sharp-cornered box model (no corner radius setbacks), matching Hilti PROFIS CBFEM. The demand force allocated to the checked face is:
+                    <strong>Weld Group Axial Capacity (§K5 Eq. K5-1 + K5-5):</strong> Under global shear or axial tension, the HSS module checks the full branch weld group directly. The total effective weld length is:
                     <div style={{ fontFamily: "monospace", margin: "4px auto", fontSize: "11.5px", maxWidth: "450px", padding: "6px", backgroundColor: "var(--surface-muted)", borderRadius: "4px", border: "1px solid var(--border-color)", textAlign: "left" }}>
-                      P_face = P_total · [Face_weld / L_total]
+                      le = 2 · Hb / sinθ + 2 · Be<br />
+                      Pn = Fnw · tw · le,   φPn = 0.75 · Pn
                     </div>
-                    where Face_weld is B_b for Face B (flanges) and H_b - 2·t_des for Face H (webs). This provides a mathematically safe, conservative lower-bound check of each individual weld line against its respective tributary load share, rather than checking a single weld against the entire global branch load.
+                    The user enters global connection actions (V and N); the app compares those demands to the group capacity. There is no selected weld face in the HSS group workflow.
                   </li>
                   <li>
-                    <strong>K5 Elastic Moment Share Method (Bending Moment):</strong> Bending moment (Mu, in-plane or out-of-plane) is resolved into a tension-compression flange force couple (F = Mu / d_couple). This force is elastically distributed between the flanges (Face B) and webs (Face H) using the AISC Table K5.1 Eq. K5-6 elastic contribution (section modulus share factor, SF):
+                    <strong>In-Plane Moment Capacity (§K5 Eq. K5-2 + K5-6):</strong> The weld group's in-plane moment capacity is computed directly from the AISC §K5 equations rather than the share-factor approximation used in earlier revisions. The effective elastic section modulus is:
                     <div style={{ fontFamily: "monospace", margin: "4px auto", fontSize: "11.5px", maxWidth: "450px", padding: "6px", backgroundColor: "var(--surface-muted)", borderRadius: "4px", border: "1px solid var(--border-color)", textAlign: "left" }}>
-                      P_face = (Mu / d_couple) · SF<br />
-                      SF = L_eff / (L_eff + d_couple / 3)
+                      Sip = tw · [ Hb² / (3·sin²θ) + Be · Hb / sinθ ]<br />
+                      Mn-ip = Fnw · Sip,   φMn-ip = 0.75 · Mn-ip
                     </div>
-                    where d_couple is the branch dimension perpendicular to the checked face (Hb for Face B, Bb for Face H). This represents a highly sophisticated, mathematically rigorous elastic distribution that prevents over-conservative un-apportioned demand checking and correlates beautifully with 3D component-based finite element mesh (CBFEM) models.
+                    The first Sip term is the webs' contribution (two parallel longitudinal welds bending about their strong axis); the second is the flanges' contribution (two transverse welds at distance Hb/(2·sinθ) from the neutral axis, with Be effective width per Eq. K1-1). Mn-ip is the connection-level flexural moment capacity — a single value for the whole weld group that correlates with Hilti CBFEM's headline %. For HSS-to-plate views this is shown as a tension/compression couple across the weld group, not as torsion about the HSS longitudinal axis.
                   </li>
                   <li>
-                    <strong>Strict Locking of k_ds = 1.0:</strong> Under transverse shear, AISC §J2.4 Eq. J2-5 permits a 1.5× directional factor increase. However, due to out-of-plane branch flexing under tension, and out-of-plane moment pulling, <strong>k_ds is strictly locked to 1.0</strong> for HSS branch welds per AISC 360-22 Table K5.1 user notes to maintain appropriate structural reliability indices.
+                    <strong>Strict Locking of k_ds = 1.0:</strong> The HSS group checks use k_ds = 1.0 for HSS branch welds per AISC 360-22 Table K5.1 user notes and §K5 commentary.
                   </li>
                   <li>
                     <strong>K5 Be Reduction Width (Eq. K1-1):</strong> Transverse branch welds pull on flexible plates/chord walls. In K5 mode, the effective width is computed as:
                     <div style={{ fontFamily: "monospace", margin: "4px auto", fontSize: "11.5px", maxWidth: "450px", textAlign: "center", padding: "6px", backgroundColor: "var(--surface-muted)", borderRadius: "4px", border: "1px solid var(--border-color)" }}>
                       Be = (10 / (B/t)) · (Fy·t / (Fyb·tb)) · Bb &le; Bb
                     </div>
-                    This reduction width is applied directly to the nominal branch face dimension being checked, representing out-of-plane flexibility limits.
+                    For HSS-to-HSS this is the in-scope §K5 application. <strong>For HSS-to-plate</strong>, this reduction is applied as <em>conservative engineering judgment</em> — the plate is treated as the chord, which under-reports group effective length and biases DCR conservative; strict §K5 defines Eq. K1-1 only for HSS chord faces.
                   </li>
                   <li>
-                    <strong>Unitary Weld Line Capacity Analysis:</strong> The calculator analyzes a single weld line in isolation (the selected face) rather than summing both opposite sides. The demand allocated to this line is its exact tributary load share (via perimeter or moment couple sharing), and is compared directly against the capacity of that single weld line (effective throat te = 0.707 · w, nominal shear stress Fnw = 0.60 · FEXX). This unitary check is mathematically identical to group-based checking but provides granular, face-specific transparency.
+                    <strong>Single Group Design Workflow:</strong> The HSS tab is a global weld-group checker. The diagram, inputs, report, and result cards all refer to the same model: the full weld group under V, N, and flexural in-plane M. Torsion about the HSS longitudinal axis is not included in this workflow.
+                  </li>
+                  <li>
+                    <strong>Combined-Loading Unity Check (§K4-9):</strong> For the HSS actions currently supported by this app, the combined group check is:
+                    <div style={{ fontFamily: "monospace", margin: "4px auto", fontSize: "11.5px", maxWidth: "450px", padding: "6px", backgroundColor: "var(--surface-muted)", borderRadius: "4px", border: "1px solid var(--border-color)", textAlign: "left" }}>
+                      Pr / Pc + Mr,ip / Mc,ip &le; 1.0
+                    </div>
+                    The calculator evaluates the current shear, tension, and in-plane moment inputs together. Zero loads are ignored, active loads produce their own group-capacity detail cards, and the final verdict sums active group DCRs automatically.
                   </li>
                 </ul>
               </div>
@@ -96,14 +102,14 @@ export default function ReferencesModal({ onClose }) {
                 </h4>
                 <ul style={{ paddingLeft: "20px", display: "flex", flexDirection: "column", gap: "6px", margin: 0 }}>
                   <li>
-                    <strong>Yield Line Theory Bending Capacity:</strong> Relies on **AISC Design Guide 1** to model plate flexural bending under out-of-plane forces. The critical bending section of the plate is checked as a plastic flexural element per AISC Chapter F:
+                    <strong>Yield Line Theory Bending Capacity:</strong> Relies on <strong>AISC Design Guide 1</strong> to model plate flexural bending under anchor tension and compression bearing. The critical bending section of the plate is checked as a plastic flexural element per AISC Chapter F:
                     <div style={{ fontFamily: "monospace", margin: "4px auto", fontSize: "11.5px", maxWidth: "450px", textAlign: "center", padding: "6px", backgroundColor: "var(--surface-muted)", borderRadius: "4px", border: "1px solid var(--border-color)" }}>
                       φMn = φ · Fy · Zp = 0.90 · Fy · (bp · tp^2 / 4)
                     </div>
                     Where φ = 0.90 is the LRFD strength reduction factor for plate flexural yielding.
                   </li>
                   <li>
-                    <strong>Plate Rigidity Parameter (Stiffness Verification):</strong> Evaluates out-of-plane plate bending and stiffness. Insufficiently rigid plates lead to localized flexural yielding, non-uniform concrete bearing pressure, and excessive prying forces on anchoring systems. The calculator computes the minimum required thickness and deflection ratios to guarantee rigid behavior.
+                    <strong>Plate Rigidity Parameter (Stiffness Verification):</strong> Evaluates plate bending stiffness under anchor forces. Insufficiently rigid plates lead to localized flexural yielding, non-uniform concrete bearing pressure, and excessive prying forces on anchoring systems. The calculator computes the minimum required thickness and deflection ratios to guarantee rigid behavior.
                   </li>
                 </ul>
               </div>

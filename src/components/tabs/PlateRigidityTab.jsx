@@ -1,9 +1,8 @@
-import React, { useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { HSS_SHAPES, STEEL_GRADES } from "../../constants/steelData";
-import { toFraction } from "../../math/weldMath";
 import { calcAnchorTensionAuto, calcMethodB, calcDG1, calcRigidityVerdict } from "../../math/plateMath";
 import { Field, InchInput, PlateThicknessSelect, HssMemberSelect, SteelGradeSelect } from "../shared/FormElements";
-import { CheckBlock, InfoTooltip } from "../shared/CheckResults";
+import { CheckBlock } from "../shared/CheckResults";
 import RigiditySvgDiagram from "../shared/RigiditySvgDiagram";
 import ReportActions from "../shared/ReportActions";
 import { buildRigidityReport } from "../../reports/buildRigidityReport";

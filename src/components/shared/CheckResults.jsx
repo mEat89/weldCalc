@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
 /**
  * Renders a single math equation trace line with its corresponding code reference
@@ -125,6 +125,158 @@ export function CheckBlock({ title, codeRef, traceSteps, statCards, checkProps, 
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * AISC 360-22 §K4-9 Combined-Loading Unity card.
+ *
+ * Accepts the current governing DCRs for axial and in-plane moment and renders
+ * the final §K4-9 unity check. The HSS tab computes these terms automatically
+ * from the current load inputs — there is no manual capture workflow.
+ */
+export function CombinedLoadingCard({ terms, unity, status, hasAnyTerm, connType = "hss2hss" }) {
+  const momentTermLabel = connType === "hss2plate" ? "Bending moment term: Mr/Mc" : "In-plane moment term: Mr,ip/Mc,ip";
+  const momentCodeRef = connType === "hss2plate"
+    ? "Current flexural weld-group bending DCR (Mu·12 / φMn)"
+    : "Current in-plane moment weld-group DCR (Mu·12 / φMn-ip)";
+  if (!hasAnyTerm) {
+    return (
+      <div className="card check-block-card">
+        <div className="check-block-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+          <span className="header-title">Final design verdict — Combined loading (§K4-9)</span>
+            <span className="header-ref">AISC 360-22 §K4 — Pr/Pc + Mr,ip/Mc,ip ≤ 1.0</span>
+          </div>
+          <span className="status-badge-mini" style={{ background: "var(--surface-subtle)", color: "var(--text-muted)" }}>—</span>
+        </div>
+        <div style={{ padding: "8px 12px", fontSize: "11.5px", color: "var(--text-muted)", lineHeight: "1.45" }}>
+          Enter at least one non-zero load (V, N, or M_ip) above. Zero loads
+          are ignored, and this final verdict updates automatically from the
+          current inputs — no capture step.
+        </div>
+      </div>
+    );
+  }
+  const isOk = status === "OK";
+  return (
+    <div className="card check-block-card">
+      <div className="check-block-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+          <span className="header-title">Final design verdict — Combined loading (§K4-9)</span>
+          <span className="header-ref">AISC 360-22 §K4 — Pr/Pc + Mr,ip/Mc,ip ≤ 1.0 (auto-aggregated)</span>
+        </div>
+        <span className={`status-badge-mini ${isOk ? "pass" : "fail"}`}>{status}</span>
+      </div>
+      <div className="check-block-content" style={{ marginTop: "6px", borderTop: "1px solid var(--border-color)", paddingTop: "6px" }}>
+        <div className="trace-steps-container">
+          <TraceStep eq={`Axial term: Pr/Pc = ${terms.axial.toFixed(3)}`} codeRef="Worse active group DCR from current shear/tension inputs" value={terms.axial.toFixed(3)} />
+          <TraceStep eq={`${momentTermLabel} = ${terms.ipMoment.toFixed(3)}`} codeRef={momentCodeRef} value={terms.ipMoment.toFixed(3)} last />
+        </div>
+        <div className="metrics-and-status-container">
+          <div className="stat-cards-vertical">
+            <StatCard label="Unity sum" value={unity.toFixed(3)} />
+            <StatCard label="Limit" value="1.000" />
+            <StatCard label="Margin" value={(1.0 - unity).toFixed(3)} />
+          </div>
+          <CheckBox
+            status={status}
+            demand={unity}
+            cap={1.0}
+            dcr={unity}
+            label={isOk ? "Final connection check adequate" : "Final connection check exceeds unity (§K4-9)"}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * AISC §K5-1 + K5-5/K5-6 Total Group Capacity card (Check 5).
+ *
+ * Shows the connection-level weld-group capacity that matches Hilti CBFEM's
+ * headline utilization %. For axial solicitation (shear/tension) it uses
+ * Eq. K5-1 (Pn = Fnw·tw·le), for in-plane moment it uses Eq. K5-2
+ * (Mn-ip = Fnw·Sip).
+ *
+ * Renders as a standard collapsible CheckBlock so group result cards are
+ * visually consistent with the rest of the app.
+ */
+export function GroupCapacityCard({ groupCap, solicitation, appliedLoad, appliedMoment, fexx, error, connType = "hss2hss" }) {
+  if (error) {
+    return (
+      <div className="card check-block-card">
+        <div className="check-block-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+            <span className="header-title">Total group capacity (§K5)</span>
+            <span className="header-ref">AISC 360-22 §K5 Eq. K5-1 / K5-5 (axial) and K5-2 / K5-6 (moment)</span>
+          </div>
+          <span className="status-badge-mini" style={{ background: "var(--surface-subtle)", color: "var(--text-muted)" }}>—</span>
+        </div>
+        <div style={{ padding: "8px 12px", fontSize: "11.5px", color: "var(--danger)" }}>
+          Could not compute group capacity: {error}
+        </div>
+      </div>
+    );
+  }
+  if (!groupCap) return null;
+
+  const isMoment = solicitation === "moment";
+  const demand = isMoment ? appliedMoment * 12 : appliedLoad;
+  const demandUnit = isMoment ? "kip-in" : "kips";
+  const nominal = isMoment ? groupCap.Mn_ip : groupCap.Pn_axial;
+  const cap = isMoment ? groupCap.cap_ip : groupCap.cap_axial;
+  const dcr = demand > 0 && cap > 0 ? demand / cap : null;
+  const status = dcr === null ? null : dcr <= 1.0 ? "OK" : "NG";
+
+  const title = isMoment
+    ? (connType === "hss2plate" ? "Total group capacity, bending moment (§K5-2 / K5-6)" : "Total group capacity, in-plane moment (§K5-2 / K5-6)")
+    : "Total group capacity, axial (§K5-1 / K5-5)";
+  const codeRef = "Full weld-group check — matches Hilti CBFEM headline % aggregation";
+
+  const traceSteps = isMoment ? [
+    { eq: `Sip = tw·[Hb²/(3·sin²θ) + Be·Hb/sinθ]`, codeRef: "AISC §K5 Eq. K5-6 — effective elastic section modulus", value: `${groupCap.Sip.toFixed(4)} in³` },
+    { eq: `  web term  = tw·Hb²/(3·sin²θ)`, codeRef: "Both webs (parallel longitudinal welds, strong-axis bending)", value: `${groupCap.terms.webTerm.toFixed(4)} in³` },
+    { eq: `  flange term = tw·Be·Hb/sinθ`, codeRef: "Both flanges (transverse welds, Be effective width)", value: `${groupCap.terms.flangeTerm.toFixed(4)} in³` },
+    { eq: `Fnw = 0.60·FEXX = 0.60·${fexx}`, codeRef: "AISC §K5: kds = 1.0 for HSS branch welds in bending", value: `${groupCap.Fnw.toFixed(2)} ksi` },
+    { eq: `Mn-ip = Fnw · Sip`, codeRef: "AISC §K5 Eq. K5-2 (nominal in-plane moment capacity)", value: `${groupCap.Mn_ip.toFixed(2)} kip-in` },
+    { eq: `φMn-ip = 0.75 · Mn-ip`, codeRef: "LRFD φ = 0.75 per §K5(a)", value: `${groupCap.cap_ip.toFixed(2)} kip-in` },
+  ] : [
+    { eq: `le = 2·Hb/sinθ + 2·Be`, codeRef: "AISC §K5 Eq. K5-5 — total effective weld length around perimeter", value: `${groupCap.le.toFixed(3)} in` },
+    { eq: `Fnw = 0.60·FEXX = 0.60·${fexx}`, codeRef: "AISC §K5: kds = 1.0 for HSS branch welds", value: `${groupCap.Fnw.toFixed(2)} ksi` },
+    { eq: `Pn = Fnw · tw · le`, codeRef: "AISC §K5 Eq. K5-1 (nominal axial capacity)", value: `${groupCap.Pn_axial.toFixed(2)} kips` },
+    { eq: `φPn = 0.75 · Pn`, codeRef: "LRFD φ = 0.75 per §K5(a)", value: `${groupCap.cap_axial.toFixed(2)} kips` },
+  ];
+
+  const statCards = isMoment ? [
+    { label: "Mn-ip nominal", value: `${nominal.toFixed(2)} ${demandUnit}` },
+    { label: "φMn-ip (LRFD)", value: `${cap.toFixed(2)} ${demandUnit}` },
+    { label: "Group DCR", value: dcr !== null ? dcr.toFixed(3) : "—" },
+  ] : [
+    { label: "Pn nominal", value: `${nominal.toFixed(2)} ${demandUnit}` },
+    { label: "φPn (LRFD)", value: `${cap.toFixed(2)} ${demandUnit}` },
+    { label: "Group DCR", value: dcr !== null ? dcr.toFixed(3) : "—" },
+  ];
+
+  const checkProps = status ? {
+    status,
+    demand,
+    cap,
+    dcr,
+    label: status === "OK"
+      ? "Total group capacity adequate"
+      : "Total group capacity exceeded",
+  } : null;
+
+  return (
+    <CheckBlock
+      title={title}
+      codeRef={codeRef}
+      traceSteps={traceSteps}
+      statCards={statCards}
+      checkProps={checkProps}
+    />
   );
 }
 

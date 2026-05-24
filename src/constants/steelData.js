@@ -132,14 +132,7 @@ export const LENGTH_METHODS = [
     label: "AISC §K5 (Reduced Be)",
     short: "AISC §K5 (Reduced Be)",
     description:
-      "Apply AISC §K5 Eq. K1-1 reduction to the transverse face for BOTH connection types. For HSS-to-plate, the plate is treated as the 'chord' with engineer-input dimension B and thickness t. For rigid plates (small B/t) the formula naturally returns Be = Bb (no reduction); for thin/flexible plates a meaningful reduction is applied. This is beyond strict AISC for HSS-to-plate but is a defensible conservative approach.",
-  },
-  {
-    id: "cbfem",
-    label: "CBFEM peak-element (Lc)",
-    short: "CBFEM Lc",
-    description:
-      "Match Hilti Profis / IDEA StatiCa CBFEM output. Engineer reads the critical-element length Lc AND the local load angle Θ from the CBFEM solver. To reproduce Profis results numerically, also enable the directional increase (kds, Eq. J2-5) with the same Θ — Profis uses standard §J2.4 for HSS-to-plate welds. The calculator treats the entire P_face as concentrated at the critical element (F_c per inch = P_face / Lc) compared against the per-inch capacity computed with the user-input Θ.",
+      "Apply AISC §K5 Eq. K1-1 reduction to the transverse branch face. For HSS-to-HSS this is the in-scope §K5 path. For HSS-to-plate, the plate is treated as the 'chord' with engineer-input dimension B and thickness t — beyond strict §K5 scope and applied as conservative engineering judgment (reduces L_eff to bias DCR conservative). Longitudinal (parallel) faces remain fully effective per Table K5.1 unless the user explicitly forces K5 on the longitudinal face.",
   },
 ];
 

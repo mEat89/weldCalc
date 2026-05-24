@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { saveAs } from "file-saver";
-import { reportFileSlug, FAIL_COLOR_HEX } from "./reportModel";
+import { reportFileSlug } from "./reportModel";
 import { svgToPng } from "./svgToPng";
 
 const FAIL_RGB = [192, 0, 0]; // #C00000
@@ -12,7 +12,7 @@ const CHECK_DESCRIPTIONS = {
   "Weld size limits": "Verifies that the provided fillet weld leg size (w) complies with the dimensional limits of AISC 360 §J2.2b and Table J2.4. It ensures the weld is large enough to prevent rapid cooling cracks (minimum size) and small enough to avoid melting away the edges of the thinner connected part (maximum size).",
   "Method B": "Evaluates the elastic bending stress in the base plate at the column face boundary per Method B. By requiring peak elastic stress to remain below the plate yield strength (σ_max ≤ Fy), it verifies the classic rigid-plate kinematic assumption used in conventional anchor rod force derivations.",
   "Plastic Cantilever": "Verifies the plastic moment capacity of the base plate cantilever under anchor tension per AISC Design Guide 1 §3.4. It calculates the minimum required plate thickness (t_req) using a plastic yield line model with LRFD resistance factor (φ = 0.90), ensuring the plate doesn't undergo excessive plastic deformation.",
-  "Effective length": "Determines the effective weld width (Be) along the branch transverse faces per AISC 360 §K5 Eq. K1-1. It accounts for localized flexible bending of the chord face under out-of-plane branch loads, which causes non-uniform stress concentration at the rigid branch corners."
+  "Effective length": "Determines the design effective weld length on the selected branch face. AISC mode uses the full nominal length. K5 mode applies Be (Eq. K1-1) to the transverse branch face — for HSS-to-HSS this is the in-scope §K5 path, and for HSS-to-plate it is offered as conservative engineering judgment (under-reports L_eff). Longitudinal faces remain fully effective per Table K5.1 unless the user enables the optional force-K5 override."
 };
 
 const REPORT_LEGEND = [
@@ -45,6 +45,21 @@ let cachedRegular = null;
 let cachedBold = null;
 let cachedItalic = null;
 
+// Locally bundled Roboto TTFs (optional — see src/assets/fonts/README.md).
+// If the user has dropped TTFs into src/assets/fonts/, Vite resolves these
+// statically and ships them with the build. If the directory is empty (only
+// the README is present), the glob result is empty and we fall back to the
+// cdnjs runtime fetch path below, and finally to Helvetica + ASCII sanitization.
+const LOCAL_FONT_URLS = import.meta.glob(
+  "../assets/fonts/Roboto-*.ttf",
+  { eager: true, query: "?url", import: "default" }
+);
+
+function findLocalFontUrl(suffix) {
+  const match = Object.entries(LOCAL_FONT_URLS).find(([path]) => path.endsWith(suffix));
+  return match ? match[1] : null;
+}
+
 async function fetchFontAsBase64(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`HTTP error ${response.status}`);
@@ -60,6 +75,14 @@ async function fetchFontAsBase64(url) {
     );
   }
   return btoa(binaryStr);
+}
+
+async function loadFontPreferLocal(localSuffix, cdnUrl) {
+  const localUrl = findLocalFontUrl(localSuffix);
+  if (localUrl) {
+    return await fetchFontAsBase64(localUrl);
+  }
+  return await fetchFontAsBase64(cdnUrl);
 }
 
 /**
@@ -104,8 +127,8 @@ function sanitizeText(s, useUnicodeFont) {
     for (const [u, r] of UNICODE_MAP) {
       if (out.indexOf(u) !== -1) out = out.split(u).join(r);
     }
-    // Safety fallback: strip any remaining non-ASCII characters to guarantee WinAnsi-safe output
-    return out.replace(/[^\x00-\x7F]/g, "");
+    // Safety fallback: strip any remaining non-ASCII characters to guarantee WinAnsi-safe output.
+    return Array.from(out).filter((ch) => ch.charCodeAt(0) <= 0x7F).join("");
   }
   return out;
 }
@@ -147,13 +170,13 @@ export async function renderPdf(model) {
   let useUnicodeFont = false;
   try {
     if (!cachedRegular) {
-      cachedRegular = await fetchFontAsBase64("https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/fonts/Roboto/Roboto-Regular.ttf");
+      cachedRegular = await loadFontPreferLocal("Roboto-Regular.ttf", "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/fonts/Roboto/Roboto-Regular.ttf");
     }
     if (!cachedBold) {
-      cachedBold = await fetchFontAsBase64("https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/fonts/Roboto/Roboto-Medium.ttf");
+      cachedBold = await loadFontPreferLocal("Roboto-Medium.ttf", "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/fonts/Roboto/Roboto-Medium.ttf");
     }
     if (!cachedItalic) {
-      cachedItalic = await fetchFontAsBase64("https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/fonts/Roboto/Roboto-Italic.ttf");
+      cachedItalic = await loadFontPreferLocal("Roboto-Italic.ttf", "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/fonts/Roboto/Roboto-Italic.ttf");
     }
 
     doc.addFileToVFS("Roboto-Regular.ttf", cachedRegular);
@@ -167,8 +190,7 @@ export async function renderPdf(model) {
 
     useUnicodeFont = true;
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn("Failed to load Unicode font Roboto from CDN. Falling back to Helvetica.", err);
+    console.warn("Failed to load Unicode font Roboto (local + CDN). Falling back to Helvetica + ASCII sanitization.", err);
   }
 
   const fontFamily = useUnicodeFont ? "Roboto" : "helvetica";
@@ -223,7 +245,6 @@ export async function renderPdf(model) {
       y += drawH + 0.18;
     } catch (err) {
       // SVG capture is non-fatal — skip silently.
-      // eslint-disable-next-line no-console
       console.warn("Diagram capture failed:", err);
     }
   }

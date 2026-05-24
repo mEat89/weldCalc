@@ -33,6 +33,16 @@ export interface BaseMetalInput {
   nLines: number;
   method: "lrfd" | "asd";
   appliedLoad: number;
+  /**
+   * Routes the base-metal check to the correct AISC §J4 limit state:
+   *  - "shear":   Eq. J4-3 yielding (0.6·Fy, φ=1.0) + Eq. J4-4 rupture (0.6·Fu, φ=0.75)
+   *  - "tension": Eq. J4-1 yielding (Fy, φ=0.90)   + Eq. J4-2 rupture (Fu, φ=0.75)
+   * Moment-couple demands route through "tension" (the apportioned force is a
+   * tension/compression couple acting axially on the flange face).
+   * Defaults to "shear" for backward compatibility with callers that haven't
+   * yet been updated.
+   */
+  solicitation?: "shear" | "tension";
 }
 
 export interface BaseMetalResult {
@@ -99,13 +109,69 @@ export interface K5LOAResult {
   gamma: number;
 }
 
+export interface SipInput {
+  Hb: number;
+  Be: number;
+  tw: number;
+  thetaDeg: number;
+}
+
+export interface SipResult {
+  Sip: number;
+  webTerm: number;    // tw · Hb²/(3·sin²θ)
+  flangeTerm: number; // tw · Be · Hb/sinθ
+}
+
+export interface MomentCapacityInput {
+  Sip: number;
+  fexx: number;
+  method: "lrfd" | "asd";
+  /** Suppresses the directional increase. AISC §K5 user note locks kds=1.0
+   *  when bending puts the weld in tension. Defaults to true. */
+  suppressDirectional?: boolean;
+}
+
+export interface MomentCapacityResult {
+  Fnw: number;
+  Mn: number;  // kip-in
+  cap: number; // kip-in (LRFD: φ·Mn with φ=0.75)
+}
+
+export interface K5GroupCapacityInput {
+  Hb: number;
+  Bb: number;
+  Be: number;
+  tw: number;
+  fexx: number;
+  thetaDeg: number;
+  method: "lrfd" | "asd";
+  /** Same directional-suppression policy as the moment helper. Default true. */
+  suppressDirectional?: boolean;
+}
+
+export interface K5GroupCapacityResult {
+  le: number;          // total effective weld length, Eq. K5-5
+  Sip: number;         // total effective elastic section modulus, Eq. K5-6
+  Fnw: number;         // nominal weld stress (kds = 1.0 for HSS branch welds)
+  Pn_axial: number;    // Eq. K5-1: Fnw·tw·le
+  cap_axial: number;   // φ·Pn (LRFD: φ=0.75)
+  Mn_ip: number;       // Eq. K5-2: Fnw·Sip (kip-in)
+  cap_ip: number;      // φ·Mn (kip-in)
+  terms: { webTerm: number; flangeTerm: number };
+}
+
 export interface FaceEffectiveLengthInput {
-  mode: "standard" | "aisc" | "k5" | "cbfem";
+  mode: "standard" | "aisc" | "k5";
   faceLength: number;
   isTransverse: boolean;
   connType: "hss2hss" | "hss2plate";
   k5?: K5EffectiveWidthResult | null;
-  cbfemLc?: number;
+  /**
+   * If true, force K5 Be reduction even when the selected face is longitudinal.
+   * Strict §K5 says longitudinal (parallel) faces are fully effective — this
+   * override is offered only as a conservative engineering judgment.
+   */
+  forceK5OnLongitudinal?: boolean;
 }
 
 export interface FaceEffectiveLengthResult {
@@ -203,10 +269,17 @@ export function calcWeldMetal(input: WeldMetalInput): WeldMetalResult {
 }
 
 /**
- * AISC 360-16 §J4.2 — Base metal shear (yielding & rupture) calculation.
+ * AISC 360-22 §J4 — Base metal limit-state check.
+ *
+ * Routes between §J4.2 (shear yielding/rupture, Eq. J4-3/J4-4) and §J4.1/J4.2
+ * (tension yielding/rupture, Eq. J4-1/J4-2) based on the `solicitation` field.
+ * Shear uses the 0.6·Fy and 0.6·Fu factors; tension does not — this distinction
+ * was previously collapsed in the app and over-stated the base-metal DCR for
+ * any tension or moment-couple demand by a factor of 1/0.6 ≈ 1.67×.
  */
 export function calcBaseMetal(input: BaseMetalInput): BaseMetalResult {
   const { baseT, fy, fu, length, nLines, method, appliedLoad } = input;
+  const solicitation = input.solicitation ?? "shear";
 
   if (!Number.isFinite(baseT) || baseT <= 0)
     throw new Error("Base metal thickness must be positive.");
@@ -221,11 +294,19 @@ export function calcBaseMetal(input: BaseMetalInput): BaseMetalResult {
 
   try {
     const A = baseT * length * nLines;
-    const RnYield = 0.6 * fy * A;
-    const RnRupture = 0.6 * fu * A;
 
-    const capYield   = method === "lrfd" ? 1.00 * RnYield   : RnYield   / 1.50;
-    const capRupture = method === "lrfd" ? 0.75 * RnRupture : RnRupture / 2.00;
+    // Yield/rupture coefficient (0.6 for shear, 1.0 for tension)
+    const k = solicitation === "shear" ? 0.6 : 1.0;
+    // Yielding resistance factor (1.00 for §J4.2 shear, 0.90 for §J4.1 tension)
+    const phiYield = solicitation === "shear" ? 1.00 : 0.90;
+    // Rupture resistance factor is φ = 0.75 in both branches.
+    const phiRupture = 0.75;
+
+    const RnYield = k * fy * A;
+    const RnRupture = k * fu * A;
+
+    const capYield   = method === "lrfd" ? phiYield * RnYield   : RnYield   / (solicitation === "shear" ? 1.50 : 1.67);
+    const capRupture = method === "lrfd" ? phiRupture * RnRupture : RnRupture / 2.00;
 
     const cap = Math.min(capYield, capRupture);
     const governs = capYield <= capRupture ? "yielding" : "rupture";
@@ -235,7 +316,7 @@ export function calcBaseMetal(input: BaseMetalInput): BaseMetalResult {
 
     return { A, RnYield, RnRupture, capYield, capRupture, cap, governs, dcr, status };
   } catch (error) {
-    throw new Error(`Error calculating base metal shear: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Error calculating base metal ${solicitation}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -325,6 +406,12 @@ export function calcK5LOA(input: K5LOAInput): K5LOAResult {
     const E = 29000; // ksi, AISC modulus of elasticity
 
     const beta = branch.B / chord.B;
+    // gamma per AISC §K5 is the chord half-width slenderness B/(2·t).
+    // The §K5 limit γ ≤ 35 is mathematically equivalent to the B/t ≤ 70
+    // bound, which is in turn implied by the stricter B/t ≤ 35 check below
+    // (Bt > 35 ⇒ γ > 17.5; well below the γ ≤ 35 ceiling). We expose gamma
+    // in the result for transparency but do not push a separate violation,
+    // since the Bt check already covers (and exceeds) the §K5 γ requirement.
     const gamma = chord.B / (2 * chord.tDes);
 
     if (beta < 0.25)
@@ -340,9 +427,8 @@ export function calcK5LOA(input: K5LOAInput): K5LOAResult {
     const Bbtb = branch.B / branch.tDes;
     const Hbtb = branch.H / branch.tDes;
     if (Bbtb > 35) violations.push(`Branch Bb/tb = ${Bbtb.toFixed(1)} > 35`);
-    if (Htbtb(Hbtb)) {
-      if (Hbtb > 35) violations.push(`Branch Hb/tb = ${Hbtb.toFixed(1)} > 35`);
-    }
+    if (Number.isFinite(Hbtb) && Hbtb > 35)
+      violations.push(`Branch Hb/tb = ${Hbtb.toFixed(1)} > 35`);
 
     const branchCompLim = 1.25 * Math.sqrt(E / branchFy);
     if (Bbtb > branchCompLim)
@@ -368,46 +454,136 @@ export function calcK5LOA(input: K5LOAInput): K5LOAResult {
   }
 }
 
-// Helper utility to make TS compiler happy or just check Hbtb definition
-function Htbtb(val: number): boolean {
-  return Number.isFinite(val);
+/**
+ * AISC 360-22 Table K5.1 Eq. K5-6 — Effective elastic section modulus for
+ * in-plane bending of a rectangular HSS branch weld group.
+ *
+ *   Sip = tw · [ Hb²/(3·sin²θ)  +  Be · Hb/sinθ ]
+ *
+ * The first term is the webs' contribution (two longitudinal welds bending
+ * about their strong axis); the second is the flanges' contribution (two
+ * transverse welds at distance Hb/(2·sinθ) from the neutral axis, with Be
+ * effective width per Eq. K1-1).
+ */
+export function calcSip(input: SipInput): SipResult {
+  const { Hb, Be, tw, thetaDeg } = input;
+
+  if (!Number.isFinite(Hb) || Hb <= 0) throw new Error("Hb must be positive.");
+  if (!Number.isFinite(Be) || Be <= 0) throw new Error("Be must be positive.");
+  if (!Number.isFinite(tw) || tw <= 0) throw new Error("tw must be positive.");
+  if (!Number.isFinite(thetaDeg) || thetaDeg <= 0 || thetaDeg > 90)
+    throw new Error("thetaDeg must be in (0, 90].");
+
+  try {
+    const sinT = Math.sin((thetaDeg * Math.PI) / 180);
+    const webTerm = tw * (Hb * Hb) / (3 * sinT * sinT);
+    const flangeTerm = tw * Be * Hb / sinT;
+    return { Sip: webTerm + flangeTerm, webTerm, flangeTerm };
+  } catch (error) {
+    throw new Error(`Error calculating Sip: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * AISC 360-22 §K5 Eq. K5-2 — In-plane moment capacity of the weld group.
+ *   Mn-ip = Fnw · Sip,  cap = φ · Mn  (φ = 0.75 LRFD)
+ * Per §K5 user note, the directional strength increase factor cannot exceed
+ * 1.0 in fillet welds at the end of rectangular HSS when bending puts the
+ * weld in tension — so Fnw = 0.6·FEXX with no kds boost.
+ */
+export function calcMomentIpCapacity(input: MomentCapacityInput): MomentCapacityResult {
+  const { Sip, fexx, method } = input;
+  if (!Number.isFinite(Sip) || Sip <= 0) throw new Error("Sip must be positive.");
+  if (!Number.isFinite(fexx) || fexx <= 0) throw new Error("FEXX must be positive.");
+
+  try {
+    const Fnw = 0.6 * fexx; // §K5 locks kds = 1.0 for bending tension
+    const Mn = Fnw * Sip;
+    const cap = method === "lrfd" ? 0.75 * Mn : Mn / 2.0;
+    return { Fnw, Mn, cap };
+  } catch (error) {
+    throw new Error(`Error calculating Mn-ip: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * AISC 360-22 §K5 — Total group capacity for axial and in-plane moment.
+ * Combines Eq. K5-1 (axial via le) and Eq. K5-2 (moment via Sip) into a
+ * single helper. Matches what Hilti PROFIS CBFEM reports as the headline
+ * "Welds = X%" utilization.
+ *
+ * For HSS-to-HSS T-, Y-, and cross-connections (Table K5.1):
+ *   le  = 2·Hb/sinθ + 2·Be           (Eq. K5-5)
+ *   Sip = tw·[Hb²/(3·sin²θ) + Be·Hb/sinθ]  (Eq. K5-6)
+ *   Pn  = Fnw·tw·le                  (Eq. K5-1)
+ *   Mn  = Fnw·Sip                    (Eq. K5-2)
+ * In K5 mode, pass Be from calcK5EffectiveWidth. In AISC mode (no reduction),
+ * pass Be = Bb.
+ */
+export function calcK5GroupCapacity(input: K5GroupCapacityInput): K5GroupCapacityResult {
+  const { Hb, Bb, Be, tw, fexx, thetaDeg, method } = input;
+  if (!Number.isFinite(Hb) || Hb <= 0) throw new Error("Hb must be positive.");
+  if (!Number.isFinite(Bb) || Bb <= 0) throw new Error("Bb must be positive.");
+  if (!Number.isFinite(Be) || Be <= 0) throw new Error("Be must be positive.");
+  if (!Number.isFinite(tw) || tw <= 0) throw new Error("tw must be positive.");
+  if (!Number.isFinite(fexx) || fexx <= 0) throw new Error("FEXX must be positive.");
+  if (!Number.isFinite(thetaDeg) || thetaDeg <= 0 || thetaDeg > 90)
+    throw new Error("thetaDeg must be in (0, 90].");
+
+  try {
+    const sinT = Math.sin((thetaDeg * Math.PI) / 180);
+    const le = 2 * Hb / sinT + 2 * Be;
+    const sipResult = calcSip({ Hb, Be, tw, thetaDeg });
+    const Fnw = 0.6 * fexx; // §K5: kds locked to 1.0 for HSS branch welds
+    const Pn_axial = Fnw * tw * le;
+    const Mn_ip = Fnw * sipResult.Sip;
+    const cap_axial = method === "lrfd" ? 0.75 * Pn_axial : Pn_axial / 2.0;
+    const cap_ip = method === "lrfd" ? 0.75 * Mn_ip : Mn_ip / 2.0;
+    return {
+      le,
+      Sip: sipResult.Sip,
+      Fnw,
+      Pn_axial,
+      cap_axial,
+      Mn_ip,
+      cap_ip,
+      terms: { webTerm: sipResult.webTerm, flangeTerm: sipResult.flangeTerm },
+    };
+  } catch (error) {
+    throw new Error(`Error calculating K5 group capacity: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 /**
  * Effective length for the user-selected face — mode-aware dispatcher.
  */
 export function calcFaceEffectiveLength(input: FaceEffectiveLengthInput): FaceEffectiveLengthResult {
-  const { mode, faceLength, isTransverse, connType, k5, cbfemLc } = input;
+  const { mode, faceLength, isTransverse, connType, k5, forceK5OnLongitudinal } = input;
 
   if (!Number.isFinite(faceLength) || faceLength <= 0)
     throw new Error("Face length must be positive.");
 
   try {
-    // Mode 3 — CBFEM peak-element Lc
-    if (mode === "cbfem") {
-      if (cbfemLc === undefined || !Number.isFinite(cbfemLc) || cbfemLc <= 0)
-        throw new Error("CBFEM Lc must be positive.");
-      if (cbfemLc > faceLength + 1e-9)
-        throw new Error(`Lc = ${cbfemLc.toFixed(3)} in exceeds nominal face length ${faceLength} in — check input.`);
-      return {
-        length: cbfemLc,
-        nominal: faceLength,
-        reduced: cbfemLc < faceLength - 1e-9,
-        ref: "CBFEM peak-element length Lc (Hilti Profis / IDEA StatiCa, user input)",
-      };
-    }
-
-    // Mode 2 — K5 Be applied to transverse face regardless of connection type
+    // K5 mode — apply Be only to the transverse (perpendicular-to-load) branch face.
+    // Longitudinal (parallel) faces are fully effective per §K5 Table K5.1,
+    // unless the user explicitly opts in to a conservative force-K5 override.
     if (mode === "k5") {
-      if (isTransverse) {
-        if (!k5) throw new Error("K5 result required for transverse face in K5 mode.");
+      const applyBe = isTransverse || forceK5OnLongitudinal === true;
+      if (applyBe) {
+        if (!k5) throw new Error("K5 result required for Be reduction in K5 mode.");
+        let ref: string;
+        if (isTransverse) {
+          ref = connType === "hss2hss"
+            ? "AISC 360 §K5 Eq. K1-1 — Be reduction (HSS chord face)"
+            : "Conservative engineering judgment — K5 Be applied to plate (derived from Eq. K1-1; strict §K5 defines this for HSS chord faces only — reduces L_eff to bias DCR conservative)";
+        } else {
+          ref = "Conservative engineering judgment — K5 Be forced on longitudinal face (strict §K5 Table K5.1 treats parallel faces as fully effective; this override under-reports L_eff)";
+        }
         return {
           length: k5.be,
           nominal: faceLength,
           reduced: k5.be < faceLength - 1e-9,
-          ref: connType === "hss2hss"
-            ? "AISC 360 §K5 Eq. K1-1 — Be (chord = HSS chord)"
-            : "AISC 360 §K5 Eq. K1-1 — Be (chord = plate, engineering judgment)",
+          ref,
         };
       }
       return {
@@ -418,7 +594,7 @@ export function calcFaceEffectiveLength(input: FaceEffectiveLengthInput): FaceEf
       };
     }
 
-    // Mode 1 — AISC Strict: assumes rigid base/chord, full nominal length is considered
+    // AISC strict mode — assumes rigid base/chord, full nominal length applies.
     return {
       length: faceLength,
       nominal: faceLength,

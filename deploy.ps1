@@ -59,7 +59,7 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Mathematical verification unit tests failed. Correct all calculation bugs before deploying."
     }
-    Write-Success "All 28 mathematical verification tests passed successfully."
+    Write-Success "All mathematical verification tests passed successfully."
 
     # Step 4: Build production assets
     Write-Step "Compiling production assets (vite build)"

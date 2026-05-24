@@ -1,8 +1,8 @@
-import React, { useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { STEEL_GRADES, LEG_SIZES, FEXX_OPTIONS, SHAPE_PRESETS, LOAD_CASES } from "../../constants/steelData";
 import { calcWeldMetal, calcBaseMetal, calcWeldSize, toFraction, to16ths } from "../../math/weldMath";
-import { Field, PlateThicknessSelect, SteelGradeSelect } from "../shared/FormElements";
-import { CheckBlock, InfoTooltip } from "../shared/CheckResults";
+import { Field, PlateThicknessSelect, SteelGradeSelect, NonNegativeNumberInput } from "../shared/FormElements";
+import { CheckBlock } from "../shared/CheckResults";
 import ShapesSvgDiagram from "../shared/ShapesSvgDiagram";
 import ReportActions from "../shared/ReportActions";
 import { buildStandardShapesReport } from "../../reports/buildStandardShapesReport";
@@ -365,13 +365,11 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
               <label htmlFor="demand-input" style={{ fontSize: "11px", fontWeight: "700", color: "var(--primary-dark)", display: "block", marginBottom: "4px", whiteSpace: "nowrap" }}>
                 Acting Axial Load, P (Ultimate) (kips)
               </label>
-              <input
+              <NonNegativeNumberInput
                 id="demand-input"
-                type="number"
-                min="0"
-                step="0.5"
                 value={appliedLoad}
-                onChange={(e) => setAppliedLoad(parseFloat(e.target.value) || 0)}
+                step="0.5"
+                onChange={setAppliedLoad}
                 className="form-input"
                 style={{ fontSize: "13.5px", fontWeight: "700", padding: "6px 10px", borderColor: "var(--primary)", backgroundColor: "var(--primary-light)" }}
               />

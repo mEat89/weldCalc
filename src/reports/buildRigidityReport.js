@@ -8,7 +8,7 @@ export function buildRigidityReport({ state, calcs, meta, diagramSvgString }) {
     column, columnOrientation,
     Nplate, Bplate, tp, plateGrade,
     Mu_ftkip, Pu, Vu,
-    anchorOffsetY, beff, beffAuto,
+    anchorOffsetY, beffAuto,
     tuMode, tuManual,
   } = state;
   const { tAuto, mB, dg1, verdict, Mu, Tu, x, beffUsed, colDimAlongM } = calcs;
