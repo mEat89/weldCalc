@@ -75,6 +75,8 @@ export const HSS_SHAPES = [
   { name: "HSS6x4x1/4",   H: 6, B: 4,  tNom: 0.250, tDes: 0.233 },
   { name: "HSS6x4x3/8",   H: 6, B: 4,  tNom: 0.375, tDes: 0.349 },
   { name: "HSS6x4x1/2",   H: 6, B: 4,  tNom: 0.500, tDes: 0.465 },
+  { name: "HSS8x2x1/8",   H: 8, B: 2,  tNom: 0.125, tDes: 0.116 },
+  { name: "HSS8x2x3/16",  H: 8, B: 2,  tNom: 0.1875, tDes: 0.174 },
   { name: "HSS8x2x1/4",   H: 8, B: 2,  tNom: 0.250, tDes: 0.233 },
   { name: "HSS8x3x1/4",   H: 8, B: 3,  tNom: 0.250, tDes: 0.233 },
   { name: "HSS8x4x1/4",   H: 8, B: 4,  tNom: 0.250, tDes: 0.233 },

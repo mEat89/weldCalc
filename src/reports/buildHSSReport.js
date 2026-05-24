@@ -9,15 +9,15 @@ import { toFraction, to16ths } from "../math/weldMath";
  */
 export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
   const {
-    connType, lengthMode,
+    connType, lengthMode, solicitation,
     branch, branchGrade, chord, chordGrade,
     plateT, plateGrade,
     branchTransverseDim, selectedFaceDim,
     loadCase, angleDeg, legSize, fexx,
-    appliedLoad, pFace, useDirectional, overrideLength, customLength,
+    appliedLoad, appliedMoment, pFace, useDirectional, overrideLength, customLength,
   } = state;
   const {
-    weld, base, size, governing, faceLen, k5, loa,
+    weld, base, size, governing, faceLen, k5, loa, dCouple,
     effLenBlock,
     fnwEq, fnwRef, designEq, designRef,
     baseT, baseFy, baseFu, baseLabel,
@@ -30,6 +30,7 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
       group: "Connection geometry",
       rows: [
         { label: "Connection type", value: connType === "hss2hss" ? "HSS-to-HSS" : "HSS-to-Plate" },
+        { label: "Solicitation type", value: solicitation === "shear" ? "Shear (In-Plane)" : solicitation === "tension" ? "Tension (Out-of-Plane)" : "Moment (In-Plane Flexure)" },
         { label: "Branch HSS", value: branch.name,
           extra: `B = ${branch.B}", H = ${branch.H}", t_des = ${branch.tDes.toFixed(4)}"` },
         ...(connType === "hss2hss" ? [
@@ -65,7 +66,7 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
       rows: [
         { label: "Leg size, w", value: toFraction(legSize), extra: to16ths(legSize) },
         { label: "Electrode", value: `E${fexx}` },
-        { label: "Load case", value: loadCase, extra: `θ = ${thetaDeg}°` },
+        { label: "Load case", value: solicitation === "shear" ? loadCase : solicitation, extra: `θ = ${thetaDeg}°` },
         { label: "Directional increase",
           value: effectiveUseDirectional ? "Allowed (1.5×)" : "Suppressed",
           extra: lockDirectional ? `Locked: ${lockReason}` : (useDirectional ? "" : "Manually suppressed") },
@@ -73,7 +74,12 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
     },
     {
       group: "Applied loads",
-      rows: [
+      rows: solicitation === "moment" ? [
+        { label: "Bending moment, M_u", value: appliedMoment > 0 ? `${appliedMoment.toFixed(2)} ft-kips` : "0 (no demand)" },
+        { label: "Couple arm, d_couple", value: `${dCouple?.toFixed(2) ?? "—"} in` },
+        { label: "Moment share factor", value: faceLen ? `${(faceLen.length / (faceLen.length + dCouple / 3) * 100).toFixed(1)}%` : "—" },
+        { label: "Demand on face, P_face", value: pFace > 0 ? `${pFace.toFixed(2)} kips` : "0 (no demand)" },
+      ] : [
         { label: "Total branch load, P_total", value: appliedLoad > 0 ? `${appliedLoad.toFixed(2)} kips` : "0 (no demand)" },
         { label: "Face share factor", value: `${(selectedFaceNominal / (2 * (branch.B + branch.H)) * 100).toFixed(1)}%` },
         { label: "Demand on face, P_face", value: pFace > 0 ? `${pFace.toFixed(2)} kips` : "0 (no demand)" },
@@ -87,12 +93,12 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
     value: `L_eff = ${faceLen.length.toFixed(3)} in (nominal ${selectedFaceNominal} in)`,
   });
   if (weld) results.push({
-    label: "Weld metal (§J2.4)",
+    label: solicitation === "shear" ? "Weld metal (§J2.4)" : "Weld metal tension (§J2.4)",
     value: `φRn = ${weld.cap.toFixed(2)} kips, DCR = ${weld.dcr !== null ? weld.dcr.toFixed(3) : "—"}`,
     status: weld.status ? (weld.status === "OK" ? "pass" : "fail") : undefined,
   });
   if (base) results.push({
-    label: `Base metal — ${baseLabel} (§J4.2)`,
+    label: solicitation === "shear" ? `Base metal — ${baseLabel} (§J4.2)` : `Base metal tension — ${baseLabel} (§J4.2)`,
     value: `φRn = ${base.cap.toFixed(2)} kips, DCR = ${base.dcr !== null ? base.dcr.toFixed(3) : "—"}`,
     status: base.status ? (base.status === "OK" ? "pass" : "fail") : undefined,
   });
@@ -121,9 +127,20 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
 
   if (weld && faceLen) {
     const faceSymbol = selectedFaceDim === "B" ? "B_b" : "H_b";
+    const L_eff = faceLen ? faceLen.length : selectedFaceNominal;
+    const pFaceStep = solicitation === "moment" ? {
+      eq: `P_face = [M·12 / d_couple] · [L_eff / (L_eff + d_couple/3)] = [${appliedMoment.toFixed(2)}·12 / ${dCouple.toFixed(2)}] · [${L_eff.toFixed(3)} / (${L_eff.toFixed(3)} + ${(dCouple/3).toFixed(3)})]`,
+      codeRef: "AISC Table K5.1 elastic moment share distribution", value: `${pFace.toFixed(2)} kips`
+    } : solicitation === "tension" ? {
+      eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
+      codeRef: "Tension force perimeter distribution", value: `${pFace.toFixed(2)} kips`
+    } : {
+      eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
+      codeRef: "Weld force perimeter distribution", value: `${pFace.toFixed(2)} kips`
+    };
+
     const steps = [
-      { eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
-        codeRef: "Weld force perimeter distribution", value: `${pFace.toFixed(2)} kips` },
+      pFaceStep,
       { eq: "te = 0.707·w", codeRef: "AISC 360-16 §J2.2a", value: `${weld.te.toFixed(4)} in` },
       { eq: `Awe = te·L_eff = ${weld.te.toFixed(4)}·${faceLen.length.toFixed(3)}`,
         codeRef: "AISC 360-16 §J2.4 effective area", value: `${weld.Awe.toFixed(3)} in²` },
@@ -142,7 +159,7 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
     steps.push({ eq: designEq, codeRef: designRef, value: `${weld.cap.toFixed(2)} kips` });
 
     checks.push({
-      title: "Check 1 — Weld metal shear rupture",
+      title: solicitation === "shear" ? "Check 1 — Weld metal shear rupture" : "Check 1 — Weld metal tension rupture",
       codeRef: "AISC 360-16 §J2.4",
       steps,
       statCards: [
@@ -152,21 +169,32 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
       ],
       verdict: weld.status ? {
         status: weld.status, demand: pFace, cap: weld.cap, dcr: weld.dcr,
-        label: weld.status === "OK" ? "Weld metal adequate" : "Weld metal inadequate",
+        label: weld.status === "OK" ? (solicitation === "shear" ? "Weld metal adequate" : "Weld metal tension adequate") : (solicitation === "shear" ? "Weld metal inadequate" : "Weld metal tension inadequate"),
       } : { status: null, demand: 0, cap: weld.cap, dcr: null, label: "No demand entered" },
     });
   }
 
   if (base && faceLen) {
     const faceSymbol = selectedFaceDim === "B" ? "B_b" : "H_b";
+    const L_eff = faceLen ? faceLen.length : selectedFaceNominal;
+    const pFaceStep = solicitation === "moment" ? {
+      eq: `P_face = [M·12 / d_couple] · [L_eff / (L_eff + d_couple/3)] = [${appliedMoment.toFixed(2)}·12 / ${dCouple.toFixed(2)}] · [${L_eff.toFixed(3)} / (${L_eff.toFixed(3)} + ${(dCouple/3).toFixed(3)})]`,
+      codeRef: "AISC Table K5.1 elastic moment share distribution", value: `${pFace.toFixed(2)} kips`
+    } : solicitation === "tension" ? {
+      eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
+      codeRef: "Tension force perimeter distribution", value: `${pFace.toFixed(2)} kips`
+    } : {
+      eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
+      codeRef: "Weld force perimeter distribution", value: `${pFace.toFixed(2)} kips`
+    };
+
     checks.push({
-      title: `Check 2 — Base metal shear (${baseLabel})`,
+      title: solicitation === "shear" ? `Check 2 — Base metal shear (${baseLabel})` : `Check 2 — Base metal tension (${baseLabel})`,
       codeRef: "AISC 360-16 §J4.2",
       steps: [
-        { eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
-          codeRef: "Weld force perimeter distribution", value: `${pFace.toFixed(2)} kips` },
+        pFaceStep,
         { eq: `A = t·L_eff = ${baseT.toFixed(4)}·${faceLen.length.toFixed(3)}`,
-          codeRef: "AISC 360-16 base shear critical area", value: `${base.A.toFixed(3)} in²` },
+          codeRef: solicitation === "shear" ? "AISC 360-16 base shear critical area" : "AISC 360-16 base critical area", value: `${base.A.toFixed(3)} in²` },
         { eq: `Yielding: Rn = 0.60·Fy·A = 0.60·${baseFy}·${base.A.toFixed(3)}`,
           codeRef: "AISC 360-16 Eq. J4-3", value: `${base.RnYield.toFixed(2)} kips` },
         { eq: "φRn (yield) = 1.00·Rn", codeRef: "φ = 1.00", value: `${base.capYield.toFixed(2)} kips` },

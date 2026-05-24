@@ -25,6 +25,7 @@ const TOOLTIP_DATA = {
 export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLegendOpen, setRefsOpen, darkMode, toggleDarkMode, reportMeta, setReportMeta }) {
   const diagramRef = useRef(null);
   const [shapeIdx, setShapeIdx] = useState(0);
+  const [p2pType, setP2pType] = useState("tjoint"); // "tjoint" | "lapjoint"
   const [loadCase, setLoadCase] = useState("long");
   const [legSize, setLegSize] = useState(0.25);
   const [length, setLength] = useState(8);
@@ -173,6 +174,30 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
           </div>
         </div>
 
+        {shape.id === "p2p" && (
+          <div className="card compact shadow-sm border-0" style={{ marginTop: "-6px" }}>
+            <div className="card-section-label">Plate joint configuration</div>
+            <div className="toggle-btn-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+              <button
+                onClick={() => setP2pType("tjoint")}
+                className={`toggle-option-btn compact ${p2pType === "tjoint" ? "active" : ""}`}
+                type="button"
+                style={{ padding: "6px", fontSize: "10.5px" }}
+              >
+                T-Joint (Perpendicular)
+              </button>
+              <button
+                onClick={() => setP2pType("lapjoint")}
+                className={`toggle-option-btn compact ${p2pType === "lapjoint" ? "active" : ""}`}
+                type="button"
+                style={{ padding: "6px", fontSize: "10.5px" }}
+              >
+                Lap Joint (Flat)
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Thicknesses & Materials */}
         <div className="card compact shadow-sm border-0">
           <div className="card-section-label">Member &amp; connected plate</div>
@@ -265,7 +290,7 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
         <div className="top-controls-grid">
           {/* Column 1: Interactive SVG Diagram */}
           <div ref={diagramRef} style={{ display: "contents" }}>
-            <ShapesSvgDiagram shape={shape} loadCase={loadCase} angleDeg={angleDeg} />
+            <ShapesSvgDiagram shape={shape} loadCase={loadCase} angleDeg={angleDeg} p2pType={p2pType} />
           </div>
 
           {/* Column 2: Load case / direction */}
@@ -353,42 +378,8 @@ export default function StandardShapesTab({ activeTab, setActiveTab, tabs, setLe
             </div>
           </div>
 
-          {/* Column 3: AISC 360-16 Weld Reference Guide */}
-          <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            <div className="card-section-label">Weld Design Guide (§J2.4)</div>
-            
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "11.5px", lineHeight: "1.4" }}>
-              <div style={{ padding: "6px 8px", backgroundColor: "var(--surface-subtle)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
-                <strong>Nominal Weld Stress (Fnw)</strong>
-                <div style={{ fontFamily: "monospace", fontSize: "11px", marginTop: "3px", color: "var(--primary)" }}>
-                  Fnw = 0.60·FEXX·(1 + 0.5·sin^1.5 θ)
-                </div>
-                <div style={{ fontSize: "10.5px", color: "var(--text-muted)", marginTop: "2px" }}>
-                  Directional increase available for θ &gt; 0° (Eq. J2-5)
-                </div>
-              </div>
-
-              <div style={{ padding: "6px 8px", backgroundColor: "var(--surface-subtle)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
-                <strong>Effective Throat (te)</strong>
-                <div style={{ fontFamily: "monospace", fontSize: "11px", marginTop: "3px", color: "var(--primary)" }}>
-                  te = 0.707·w
-                </div>
-                <div style={{ fontSize: "10.5px", color: "var(--text-muted)", marginTop: "2px" }}>
-                  For fillet welds with nominal leg size (w)
-                </div>
-              </div>
-
-              <div style={{ padding: "6px 8px", backgroundColor: "var(--surface-subtle)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
-                <strong>Design Strength (φRn)</strong>
-                <div style={{ fontFamily: "monospace", fontSize: "11px", marginTop: "3px", color: "var(--primary)" }}>
-                  φRn = φ·Fnw·Awe
-                </div>
-                <div style={{ fontSize: "10.5px", color: "var(--text-muted)", marginTop: "2px" }}>
-                  LRFD Resistance Factor: φ = 0.75 (§J2.4a)
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Column 3: Interactive SVG Diagram (Top-Down View, synchronized load arrow) */}
+          <ShapesSvgDiagram shape={shape} loadCase={loadCase} angleDeg={angleDeg} view="top" p2pType={p2pType} />
         </div>
 
         {calcError && (

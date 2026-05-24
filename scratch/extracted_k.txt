@@ -1,0 +1,182 @@
+--- PAGE 13 ---
+  16.1-169
+Specification for Structural Steel Buildings, August 1, 2022 
+American Institute of Steel Construction
+TABLE K4.2 
+Available Strengths of Rectangular HSS-to-HSS 
+Moment Connections
+Connection Type Connection Available Flexural Strength
+Branch(es) under out-of-plane bending 
+T- and cross-connections
+Limit state: chord sidewall local yielding
+                 MF tB tH tno py b- =− () +()* 5         (K4-6)
+f = 1.00 (LRFD)  W = 1.50 (ASD)
+Limit state: chord distortional failure, for 
+T-connections and unbalanced cross-connections
+ 
+            MF tH tB Ht BHno py b- =+ +() 2    (K4-7)
+f = 0.95 (LRFD)  W = 1.58 (ASD)
+Branch(es) under in-plane bending 
+T- and cross-connections
+Limit state: sidewall local yielding
+When b ≥ 0.85
+ MF tH tni py b- =+ ()05 5 2. *        (K4-8)
+f = 1.00 (LRFD)  W = 1.50 (ASD)
+For T- and cross-connections, with branch(es) under combined axial load, in-plane bending, 
+and out-of-plane bending, or any combination of these load effects
+P
+P
+M
+M
+M
+M
+r
+c
+ri p
+ci p
+ro p
+co p
+++ ≤-
+-
+-
+-
+1.0                                               (K4-9)
+Pr      = required axial strength in branch using LRFD or ASD load combinations, kips (N)
+Mr-ip  =  required in-plane flexural strength in branch using LRFD or ASD load combinations, 
+kip-in. (N-mm) 
+Mr-op  =  required out-of-plane flexural strength in branch using LRFD or ASD load combina -
+tions, kip-in. (N-mm)  
+Pc      = available axial strength, kips (N) 
+Mc-ip  = available strength for in-plane bending, kip-in. (N-mm) 
+Mc-op = available strength for out-of-plane bending, kip-in. (N-mm) 
+         = fMn-op (LRFD); = Mno p- Ω (ASD)
+Functions
+Fy* = Fy for T-connections and 0.8Fy for cross-connections
+Pro = Pu for LRFD, and Pa for ASD;  Mro = Mu for LRFD, and Ma for ASD
+Sect. K5.] WELDS OF PLATES AND BRANCHES TO HSS
+Part 16.1 J-N (121-194).indd   169Part 16.1 J-N (121-194).indd   169 2023-01-29   12:11 PM2023-01-29   12:11 PM
+
+--- PAGE 14 ---
+16.1-170 
+Specification for Structural Steel Buildings, August 1, 2022 
+American Institute of Steel Construction
+TABLE K4.2A 
+Limits of Applicability of Table K4.2
+Branch angle: q @ 90°
+Chord wall slenderness: Bt  and Ht ≤ 35
+Branch wall slenderness: Btb b  and Htbb ≤ 35
+≤
+  
+12 5. E
+Fyb  
+Width ratio: BBb ≥ 0.25
+Aspect ratio: 05 20.. ≤≤HBb b ≤ 2.0 and 0.5 ≤ 05 20.. ≤≤HB
+Material strength: Fy and Fyb ≤ 52 ksi (360 MPa)
+Ductility: FFyu  and FFyb ub ≤ 08.FFyb ub ≤ 08.   Note: ASTM A500/A500M Grade 
+C is acceptable.
+where
+Fnw =  nominal stress of weld metal in accordance with Chapter J, ksi (MPa)
+Sip =  effective elastic section modulus of welds for in-plane bending (Table 
+K5.1), in.3 (mm3)
+Sop =  effective elastic section modulus of welds for out-of-plane bending (Table 
+K5.1), in.3 (mm3)
+le =  total effective weld length of groove and fillet welds to HSS for weld 
+strength calculations, in. (mm)
+tw =  smallest effective weld throat thickness around the perimeter of branch or 
+plate, in. (mm)
+User Note:  Where flexure results in tension in any load case in the weld the 
+directional strength increase factor cannot exceed 1.0 in fillet welds to the end of 
+rectangular HSS. 
+When a rectangular overlapped K-connection has been designed in accordance with 
+Table K3.2, and the branch member component forces normal to the chord are 80% 
+balanced (in other words, the branch member forces normal to the chord face differ 
+by no more than 20%), the hidden weld under an overlapping branch may be omitted 
+if the remaining welds to the overlapped branch everywhere develop the full capacity 
+of the overlapped branch member walls.
+The weld checks in Tables K5.1 and K5.2 are not required if the welds are capable 
+of developing the full strength of the branch member wall along its entire perimeter 
+(or a plate along its entire length).  
+User Note:  The approach used here to allow downsizing of welds assumes a 
+constant weld size around the full perimeter of the HSS branch. Special attention 
+is required for equal width (or near-equal width) connections to rectangular HSS, 
+which combine partial-joint-penetration groove welds along the matched edges of 
+the connection, with fillet welds generally across the chord member face.
+ WELDS OF PLATES AND BRANCHES TO HSS [Sect. K5.
+Part 16.1 J-N (121-194).indd   170Part 16.1 J-N (121-194).indd   170 2023-01-11   12:27 PM2023-01-11   12:27 PM
+
+--- PAGE 15 ---
+  16.1-171
+Specification for Structural Steel Buildings, August 1, 2022 
+American Institute of Steel Construction
+TABLE K5.1
+Effective Weld Properties for Connections to 
+Rectangular HSS
+Connection Type Weld Properties
+Transverse plate T- and cross- 
+connections under plate axial load
+Effective weld properties
+                                 lee B= 2                           (K5-4)
+where le = total effective weld length for welds on  
+both sides of the transverse plate, in. (mm)
+T-, Y-, and cross-connections
+under branch axial load or bending
+Effective weld properties
+              le
+b
+e
+H B=+2 2sinθ              (K5-5)
+  S tH tB H
+ip
+wb
+we
+b= 
+
+ 
+
+ + 
+
+ 
+
+
+3
+2
+sin sinθθ            (K5-6)
+   
+St H B t B tB B
+Bop w
+b
+b
+w
+b
+wb e
+b
+= 
+
+ 
+
+ + ( ) − () −()
+sinθ 3
+32
+3
+  (K5-7)
+When β > 0.85 or θ > 50°, Be 2 shall not exceed 
+Bb 4.
+Gapped K-connections under branch 
+axial load
+Effective weld properties
+When θ ≤ 50°
+          
+ 
+le
+bb
+bb
+Ht Bt= −() +− ()21 2 21 2. .sinθ        (K5-8)
+When θ ≥ 60°
+            le
+bb
+bb
+Ht Bt= −() +−21 2 12. .sinθ           (K5-9)
+When 50° < θ < 60°, linear interpolation shall be  
+used to determine le.
+Sect. K5.] WELDS OF PLATES AND BRANCHES TO HSS
+Part 16.1 J-N (121-194).indd   171Part 16.1 J-N (121-194).indd   171 2023-01-10   8:06 PM2023-01-10   8:06 PM

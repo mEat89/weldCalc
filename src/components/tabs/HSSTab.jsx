@@ -78,7 +78,9 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
   const [angleDeg, setAngleDeg] = useState(90);
   const [legSize, setLegSize] = useState(0.25);
   const [fexx, setFexx] = useState(70);
+  const [solicitation, setSolicitation] = useState("shear"); // "shear" | "tension" | "moment"
   const [appliedLoad, setAppliedLoad] = useState(0);
+  const [appliedMoment, setAppliedMoment] = useState(0);
   const [useDirectional, setUseDirectional] = useState(false);
   const [overrideLength, setOverrideLength] = useState(false);
   const [customLength, setCustomLength] = useState(0);
@@ -97,7 +99,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
   const parallelLen   = branchTransverseDim === "B" ? branch.H : branch.B;
   const selectedFaceNominal = selectedFaceDim === "B" ? branch.B : branch.H;
 
-  const pFace = appliedLoad * (selectedFaceNominal / (2 * (branch.B + branch.H)));
+  const dCouple = selectedFaceDim === "B" ? branch.H : branch.B;
   const faceSymbol = selectedFaceDim === "B" ? "B_b" : "H_b";
 
   const thetaDeg = loadCase === "long" ? 0 : loadCase === "trans" ? 90 : angleDeg;
@@ -150,6 +152,12 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
       : dispatched;
   } catch (e) { faceLenError = e instanceof Error ? e.message : String(e); }
 
+  const L_eff = faceLen ? faceLen.length : selectedFaceNominal;
+  const momentShareFactor = L_eff / (L_eff + dCouple / 3);
+  const pFace = solicitation === "moment"
+    ? ((appliedMoment * 12) / dCouple) * momentShareFactor
+    : appliedLoad * (selectedFaceNominal / (2 * (branch.B + branch.H)));
+
   // Base metal determination
   let baseT, baseFy, baseFu, baseLabel;
   if (connType === "hss2plate") {
@@ -167,12 +175,18 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
 
   // Directional strength increase (kds) lock policies
   const lockDirectional =
+    solicitation === "tension" ||
+    solicitation === "moment" ||
     connType === "hss2hss" ||
     (connType === "hss2plate" && lengthMode === "k5");
   const lockReason =
-    connType === "hss2hss"
-      ? "per AISC 360-22 §K5 commentary (kds factor omitted for HSS branch welds — non-uniform chord wall stiffness)"
-      : "per K5 mode engineering judgment (kds suppressed alongside K5 Be reduction on HSS-to-plate)";
+    solicitation === "tension"
+      ? "per AISC 360-22 Table K5.1 user note (directional increase factor cannot exceed 1.0 in fillet welds to the end of rectangular HSS)"
+      : solicitation === "moment"
+        ? "per AISC 360-22 Table K5.1 user note (directional increase factor cannot exceed 1.0 for moment connection weld tension chords)"
+        : connType === "hss2hss"
+          ? "per AISC 360-22 §K5 commentary (kds factor omitted for HSS branch welds — non-uniform chord wall stiffness)"
+          : "per K5 mode engineering judgment (kds suppressed alongside K5 Be reduction on HSS-to-plate)";
   const effectiveUseDirectional = lockDirectional ? false : useDirectional;
 
   // Primary Capacity Calculations
@@ -206,11 +220,15 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
     ? "Fnw = 0.60·FEXX·(1 + 0.5·sin^1.5 θ)" : "Fnw = 0.60·FEXX";
   const fnwRef = effectiveUseDirectional
     ? `AISC 360-22 §J2.4, Eq. J2-5 (θ = ${thetaDeg}°)`
-    : (connType === "hss2hss"
-        ? "AISC 360-22 §K5 commentary — kds=1.0 for HSS branch welds (non-uniform chord stiffness)"
-        : (lengthMode === "k5"
-            ? "kds=1.0 in K5 Be mode — engineering judgment consistent with the conservative effective-width extension"
-            : "AISC 360-22 §J2.4 — directional increase available but user has it disabled (conservative)"));
+    : (solicitation === "tension"
+        ? "AISC 360-22 Table K5.1 user note — kds=1.0 for out-of-plane tension welds"
+        : solicitation === "moment"
+          ? "AISC 360-22 Table K5.1 user note — kds=1.0 for out-of-plane moment pulling welds"
+          : (connType === "hss2hss"
+              ? "AISC 360-22 §K5 commentary — kds=1.0 for HSS branch welds (non-uniform chord stiffness)"
+              : (lengthMode === "k5"
+                  ? "kds=1.0 in K5 Be mode — engineering judgment consistent with the conservative effective-width extension"
+                  : "AISC 360-22 §J2.4 — directional increase available but user has it disabled (conservative)")));
 
   const designEq = "φRn = 0.75·Rn";
   const designRef = "AISC 360-16 §J2.4 — LRFD resistance factor";
@@ -309,15 +327,15 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
               diagramRef={diagramRef}
               buildModel={(meta, diagramSvgString) => buildHSSReport({
                 state: {
-                  connType, lengthMode,
+                  connType, lengthMode, solicitation,
                   branch, branchGrade, chord, chordGrade,
                   plateT, plateGrade,
                   branchTransverseDim, selectedFaceDim,
                   loadCase, angleDeg, legSize, fexx,
-                  appliedLoad, pFace, useDirectional, overrideLength, customLength,
+                  appliedLoad, appliedMoment, pFace, useDirectional, overrideLength, customLength,
                 },
                 calcs: {
-                  weld, base, size, governing, faceLen, k5, loa,
+                  weld, base, size, governing, faceLen, k5, loa, dCouple,
                   effLenBlock: effLenBlockForReport,
                   fnwEq, fnwRef, designEq, designRef,
                   baseT, baseFy, baseFu, baseLabel,
@@ -354,6 +372,37 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
             </button>
           ))}
         </nav>
+
+        {/* Solicitation Selector */}
+        <div className="card compact shadow-sm border-0">
+          <div className="card-section-label">Solicitation type</div>
+          <div className="toggle-btn-grid" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: "4px" }}>
+            <button
+              onClick={() => setSolicitation("shear")}
+              className={`toggle-option-btn compact ${solicitation === "shear" ? "active" : ""}`}
+              type="button"
+              style={{ padding: "6px 2px", fontSize: "10px" }}
+            >
+              <div className="btn-main-label" style={{ fontSize: "10px", fontWeight: "700" }}>Shear</div>
+            </button>
+            <button
+              onClick={() => setSolicitation("tension")}
+              className={`toggle-option-btn compact ${solicitation === "tension" ? "active" : ""}`}
+              type="button"
+              style={{ padding: "6px 2px", fontSize: "10px" }}
+            >
+              <div className="btn-main-label" style={{ fontSize: "10px", fontWeight: "700" }}>Tension</div>
+            </button>
+            <button
+              onClick={() => setSolicitation("moment")}
+              className={`toggle-option-btn compact ${solicitation === "moment" ? "active" : ""}`}
+              type="button"
+              style={{ padding: "6px 2px", fontSize: "10px" }}
+            >
+              <div className="btn-main-label" style={{ fontSize: "10px", fontWeight: "700" }}>Moment</div>
+            </button>
+          </div>
+        </div>
 
         {/* Connection Type Selection */}
         <div className="card compact shadow-sm border-0">
@@ -576,11 +625,11 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
               branch={branch}
               loadCase={loadCase}
               angleDeg={angleDeg}
+              solicitation={solicitation}
             />
           </div>
           
-          {/* Column 2: Weld Face Selection & Branch Orientation (Standalone Card) */}
-          <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", gap: "10px", justifyContent: "center" }}>
+          <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               <div className="card-section-label" style={{ margin: 0, paddingLeft: "6px", fontSize: "10px" }}>Weld Line to Analyze (analyzes single line at a time)</div>
               <div className="toggle-btn-grid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: "6px" }}>
@@ -636,93 +685,126 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
           </div>
 
           {/* Column 2: Load case / direction (Compacted) */}
-          <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          <div className="card compact top-grid-card" style={{ display: "flex", flexDirection: "column", gap: "6px", opacity: solicitation === "shear" ? 1 : 0.65 }}>
             <div className="card-section-label">Load Case &amp; Direction</div>
-            <div className="load-case-btn-grid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: "4px" }}>
-              {LOAD_CASES.map((c) => {
-                const isActive = loadCase === c.id;
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => setLoadCase(c.id)}
-                    className={`load-case-btn compact ${isActive ? "active" : ""}`}
-                    type="button"
-                    style={{
-                      padding: "5px 8px",
-                      fontSize: "11px",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      width: "100%",
-                      border: isActive ? "1px solid var(--primary)" : "1px solid var(--border-color)",
-                      borderRadius: "var(--radius-sm)",
-                      backgroundColor: isActive ? "var(--primary-light)" : "var(--card-bg)",
-                      color: isActive ? "var(--primary-dark)" : "var(--text-main)",
-                      cursor: "pointer"
-                    }}
-                  >
-                    <span style={{ fontWeight: "700" }}>{c.label}</span>
-                    <span style={{ fontSize: "10px", opacity: 0.8 }}>{c.angle}</span>
-                  </button>
-                );
-              })}
-            </div>
-            
-            <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px", lineHeight: "1.3" }}>
-              {LOAD_CASES.find((c) => c.id === loadCase)?.description}
-            </div>
+            {solicitation === "shear" ? (
+              <>
+                <div className="load-case-btn-grid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: "4px" }}>
+                  {LOAD_CASES.map((c) => {
+                    const isActive = loadCase === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => setLoadCase(c.id)}
+                        className={`load-case-btn compact ${isActive ? "active" : ""}`}
+                        type="button"
+                        style={{
+                          padding: "5px 8px",
+                          fontSize: "11px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          width: "100%",
+                          border: isActive ? "1px solid var(--primary)" : "1px solid var(--border-color)",
+                          borderRadius: "var(--radius-sm)",
+                          backgroundColor: isActive ? "var(--primary-light)" : "var(--card-bg)",
+                          color: isActive ? "var(--primary-dark)" : "var(--text-main)",
+                          cursor: "pointer"
+                        }}
+                      >
+                        <span style={{ fontWeight: "700" }}>{c.label}</span>
+                        <span style={{ fontSize: "10px", opacity: 0.8 }}>{c.angle}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px", lineHeight: "1.3" }}>
+                  {LOAD_CASES.find((c) => c.id === loadCase)?.description}
+                </div>
 
-            {loadCase === "trans" && (
-              <div style={{ marginTop: "4px", fontSize: "11px", backgroundColor: "var(--primary-light)", border: "1px solid var(--border-color)", color: "var(--primary-dark)", padding: "4px 6px", borderRadius: "var(--radius-sm)" }}>
-                {lockDirectional ? (
-                  <span style={{ color: "inherit", fontWeight: "600", fontSize: "10px" }}>
-                    kds = 1.0 Locked: {connType === "hss2hss" ? "HSS branch weld non-uniformity" : "K5 Be mode"}
-                  </span>
-                ) : (
-                  <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "10px", color: "inherit" }}>
-                    <input
-                      type="checkbox"
-                      checked={!useDirectional}
-                      onChange={(e) => setUseDirectional(!e.target.checked)}
-                      style={{ cursor: "pointer" }}
-                    />
-                    <span>Suppress 1.5× directional increase</span>
-                  </label>
+                {loadCase === "trans" && (
+                  <div style={{ marginTop: "4px", fontSize: "11px", backgroundColor: "var(--primary-light)", border: "1px solid var(--border-color)", color: "var(--primary-dark)", padding: "4px 6px", borderRadius: "var(--radius-sm)" }}>
+                    {lockDirectional ? (
+                      <span style={{ color: "inherit", fontWeight: "600", fontSize: "10px" }}>
+                        kds = 1.0 Locked: {connType === "hss2hss" ? "HSS branch weld non-uniformity" : "K5 Be mode"}
+                      </span>
+                    ) : (
+                      <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "10px", color: "inherit" }}>
+                        <input
+                          type="checkbox"
+                          checked={!useDirectional}
+                          onChange={(e) => setUseDirectional(!e.target.checked)}
+                          style={{ cursor: "pointer" }}
+                        />
+                        <span>Suppress 1.5× directional increase</span>
+                      </label>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
-            
-            {loadCase === "angle" && (
-              <div style={{ marginTop: "4px" }}>
-                <label className="form-label" style={{ fontSize: "10px", display: "flex", justifyContent: "space-between" }}>
-                  <span>Load angle:</span>
-                  <strong>{angleDeg}°</strong>
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="90"
-                  step="1"
-                  value={angleDeg}
-                  onChange={(e) => setAngleDeg(parseInt(e.target.value, 10))}
-                  style={{ width: "100%", marginTop: "2px" }}
-                />
+                
+                {loadCase === "angle" && (
+                  <div style={{ marginTop: "4px" }}>
+                    <label className="form-label" style={{ fontSize: "10px", display: "flex", justifyContent: "space-between" }}>
+                      <span>Load angle:</span>
+                      <strong>{angleDeg}°</strong>
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="90"
+                      step="1"
+                      value={angleDeg}
+                      onChange={(e) => setAngleDeg(parseInt(e.target.value, 10))}
+                      style={{ width: "100%", marginTop: "2px" }}
+                    />
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ display: "flex", flex: 1, flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center", padding: "12px", color: "var(--text-muted)", fontSize: "11px", lineHeight: "1.4" }}>
+                <span>🔒 Directional parameters inactive</span>
+                <span style={{ fontSize: "10px", marginTop: "6px" }}>
+                  {solicitation === "tension"
+                    ? "Tension acts perpendicular (normal) to the base plate. Arrow orientation is fixed out-of-plane."
+                    : "Moment couple tension acts normal to the checked flange weld chord. Load orientation is fixed."}
+                </span>
               </div>
             )}
             <div style={{ marginTop: "10px", paddingTop: "8px", borderTop: "1px dashed var(--border-color)" }}>
-              <label htmlFor="demand-input" style={{ fontSize: "11px", fontWeight: "700", color: "var(--primary-dark)", display: "block", marginBottom: "4px", whiteSpace: "nowrap" }}>
-                Acting Axial Load, P (Ultimate) (kips)
-              </label>
-              <input
-                id="demand-input"
-                type="number"
-                min="0"
-                step="0.5"
-                value={appliedLoad}
-                onChange={(e) => setAppliedLoad(parseFloat(e.target.value) || 0)}
-                className="form-input"
-                style={{ fontSize: "13.5px", fontWeight: "700", padding: "6px 10px", borderColor: "var(--primary)", backgroundColor: "var(--primary-light)" }}
-              />
+              {solicitation === "moment" ? (
+                <>
+                  <label htmlFor="demand-moment-input" style={{ fontSize: "11px", fontWeight: "700", color: "var(--primary-dark)", display: "block", marginBottom: "4px", whiteSpace: "nowrap" }}>
+                    Acting Bending Moment, M (Ultimate) (ft-kips)
+                  </label>
+                  <input
+                    id="demand-moment-input"
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={appliedMoment}
+                    onChange={(e) => setAppliedMoment(parseFloat(e.target.value) || 0)}
+                    className="form-input"
+                    style={{ fontSize: "13.5px", fontWeight: "700", padding: "6px 10px", borderColor: "var(--primary)", backgroundColor: "var(--primary-light)" }}
+                  />
+                </>
+              ) : (
+                <>
+                  <label htmlFor="demand-input" style={{ fontSize: "11px", fontWeight: "700", color: "var(--primary-dark)", display: "block", marginBottom: "4px", whiteSpace: "nowrap" }}>
+                    Acting Axial Load, P (Ultimate) (kips)
+                  </label>
+                  <input
+                    id="demand-input"
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={appliedLoad}
+                    onChange={(e) => setAppliedLoad(parseFloat(e.target.value) || 0)}
+                    className="form-input"
+                    style={{ fontSize: "13.5px", fontWeight: "700", padding: "6px 10px", borderColor: "var(--primary)", backgroundColor: "var(--primary-light)" }}
+                  />
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -759,12 +841,23 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
         {/* Check 1: Weld metal (Collapsible) */}
         {weld && (
           <CheckBlock
-            title="Check 1: Weld metal shear rupture"
+            title={solicitation === "shear" ? "Check 1: Weld metal shear rupture" : "Check 1: Weld metal tension rupture"}
             codeRef="AISC 360-16 §J2.4"
             tooltipSections={TOOLTIP_DATA.weldMetal}
             traceSteps={[
-              { eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
-                codeRef: "Weld force perimeter distribution", value: `${pFace.toFixed(2)} kips` },
+              solicitation === "moment" ? {
+                eq: `P_face = (M·12/d)·SF = (${appliedMoment.toFixed(2)}·12/${dCouple.toFixed(2)})·${momentShareFactor.toFixed(3)}`,
+                codeRef: "AISC Table K5.1 elastic share (SF = Le/(Le+d/3))",
+                value: `${pFace.toFixed(2)} kips`
+              } : solicitation === "tension" ? {
+                eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
+                codeRef: "Tension force perimeter distribution",
+                value: `${pFace.toFixed(2)} kips`
+              } : {
+                eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
+                codeRef: "Weld force perimeter distribution",
+                value: `${pFace.toFixed(2)} kips`
+              },
               { eq: "te = 0.707·w", codeRef: "AISC 360-16 §J2.2a", value: `${weld.te.toFixed(4)} in` },
               { eq: `Awe = te·L_eff = ${weld.te.toFixed(4)}·${faceLen.length.toFixed(3)}`,
                 codeRef: "AISC 360-16 §J2.4 effective area", value: `${weld.Awe.toFixed(3)} in²` },
@@ -784,7 +877,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
             ]}
             checkProps={weld.status ? {
               status: weld.status, demand: pFace, cap: weld.cap, dcr: weld.dcr,
-              label: weld.status === "OK" ? "Weld metal adequate" : "Weld metal inadequate",
+              label: weld.status === "OK" ? (solicitation === "shear" ? "Weld metal shear adequate" : "Weld metal tension adequate") : (solicitation === "shear" ? "Weld metal shear inadequate" : "Weld metal tension inadequate"),
             } : null}
           />
         )}
@@ -792,14 +885,25 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
         {/* Check 2: Base metal (Collapsible) */}
         {base && (
           <CheckBlock
-            title={`Check 2: Base metal shear (${baseLabel})`}
+            title={solicitation === "shear" ? `Check 2: Base metal shear (${baseLabel})` : `Check 2: Base metal tension (${baseLabel})`}
             codeRef="AISC 360-16 §J4.2"
             tooltipSections={TOOLTIP_DATA.baseMetal}
             traceSteps={[
-              { eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
-                codeRef: "Weld force perimeter distribution", value: `${pFace.toFixed(2)} kips` },
+              solicitation === "moment" ? {
+                eq: `P_face = (M·12/d)·SF = (${appliedMoment.toFixed(2)}·12/${dCouple.toFixed(2)})·${momentShareFactor.toFixed(3)}`,
+                codeRef: "AISC Table K5.1 elastic share (SF = Le/(Le+d/3))",
+                value: `${pFace.toFixed(2)} kips`
+              } : solicitation === "tension" ? {
+                eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
+                codeRef: "Tension force perimeter distribution",
+                value: `${pFace.toFixed(2)} kips`
+              } : {
+                eq: `P_face = P·[${faceSymbol} / 2(B_b+H_b)] = ${appliedLoad.toFixed(2)}·[${selectedFaceNominal} / ${2 * (branch.B + branch.H)}]`,
+                codeRef: "Weld force perimeter distribution",
+                value: `${pFace.toFixed(2)} kips`
+              },
               { eq: `A = t·L_eff = ${baseT.toFixed(4)}·${faceLen.length.toFixed(3)}`,
-                codeRef: "AISC 360-16 base shear critical area", value: `${base.A.toFixed(3)} in²` },
+                codeRef: "AISC 360-16 base critical area", value: `${base.A.toFixed(3)} in²` },
               { eq: `Yielding: Rn = 0.60·Fy·A = 0.60·${baseFy}·${base.A.toFixed(3)}`,
                 codeRef: "AISC 360-16 Eq. J4-3", value: `${base.RnYield.toFixed(2)} kips` },
               { eq: "φRn (yield) = 1.00·Rn",
@@ -818,7 +922,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
             ]}
             checkProps={base.status ? {
               status: base.status, demand: pFace, cap: base.cap, dcr: base.dcr,
-              label: base.status === "OK" ? "Base metal adequate" : "Base metal inadequate",
+              label: base.status === "OK" ? (solicitation === "shear" ? "Base metal shear adequate" : "Base metal tension adequate") : (solicitation === "shear" ? "Base metal shear inadequate" : "Base metal tension inadequate"),
             } : null}
           />
         )}
