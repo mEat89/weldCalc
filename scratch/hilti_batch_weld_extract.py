@@ -19,6 +19,11 @@ def extract_report(report_no: int) -> dict:
     path = DOWNLOADS / f"MUE26031001-DunesHotelCanopy_Concrete - May 23, 2026 ({report_no}).pdf"
     text = "\n".join(page.extract_text() or "" for page in PdfReader(str(path)).pages)
 
+    plate = re.search(
+        r"Anchor plate.*?=\s*([0-9.]+) in\. x ([0-9.]+) in\. x ([0-9.]+) in\.",
+        text,
+        re.S,
+    )
     profile = re.search(
         r"Profile:.*?,\s*([^;]+);\s*\(L x W x T\)\s*=\s*([0-9.]+) in\. x ([0-9.]+) in\. x ([0-9.]+) in\.",
         text,
@@ -70,6 +75,8 @@ def extract_report(report_no: int) -> dict:
 
     if not profile:
         raise ValueError(f"Report {report_no}: profile not found")
+    if not plate:
+        raise ValueError(f"Report {report_no}: plate geometry not found")
     if not loads:
         raise ValueError(f"Report {report_no}: loads not found")
     if not rows:
@@ -81,6 +88,11 @@ def extract_report(report_no: int) -> dict:
         "L": fnum(profile.group(2)),
         "W": fnum(profile.group(3)),
         "Tnom": fnum(profile.group(4)),
+        "plate": {
+            "lx": fnum(plate.group(1)),
+            "ly": fnum(plate.group(2)),
+            "t": fnum(plate.group(3)),
+        },
         "loads": {
             "N": fnum(loads.group(1)),
             "Vx": fnum(loads.group(2)),
@@ -95,7 +107,14 @@ def extract_report(report_no: int) -> dict:
 
 
 def main() -> int:
-    reports = [extract_report(report_no) for report_no in range(7, 24)]
+    report_numbers = [
+        int(arg)
+        for arg in sys.argv[1:]
+        if re.fullmatch(r"\d+", arg)
+    ]
+    if not report_numbers:
+        report_numbers = list(range(7, 24))
+    reports = [extract_report(report_no) for report_no in report_numbers]
     if "--json" in sys.argv:
         print(json.dumps(reports, indent=2))
         return 0

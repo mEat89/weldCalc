@@ -63,7 +63,7 @@ export default function ReferencesModal({ onClose }) {
                     <strong>HSS-to-Plate Local Weld Discretization (AISC Manual Part 8):</strong> The separate local HSS-to-plate workflow discretizes the weld perimeter into read-only deterministic elements, distributes direct V/N and flexural M using elastic weld-group mechanics, and checks each segment with AISC §J2.4 weld metal plus §J4.1/§J4.2 base metal strength. Mesh density is controlled by tested code constants and is not user selectable.
                   </li>
                   <li>
-                    <strong>CBFEM Benchmark Guardrail:</strong> Hilti/IDEA-style finite element checks are used as correlation evidence, not as the legal design basis. For validated benchmark geometries, regression tests require local segment utilization to be at least the Hilti reported utilization. Outside that benchmark envelope, the app reports a limitation warning rather than claiming universal CBFEM conservatism.
+                    <strong>CBFEM Trend Guardrail:</strong> Hilti/IDEA-style finite element checks are used as correlation evidence, not as the legal design basis. The simplified trend check is limited to downward shear V, axial tension N, and top-bottom bending M; out-of-plane shear and moment are intentionally excluded. Outside that benchmark envelope, the app reports a limitation warning rather than claiming universal CBFEM equivalence.
                   </li>
                   <li>
                     <strong>Combined-Loading Unity Check (§K4-9):</strong> For the HSS actions currently supported by this app, the combined group check is:

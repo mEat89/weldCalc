@@ -47,6 +47,11 @@ Extracted governing weld utilizations:
 | 21 | HSS10X3X.375 | N=12, Vx=8, Vy=0 | 52% |
 | 22 | HSS12X4X.1875 | N=12, Vx=8, Vy=0 | 31% |
 | 23 | HSS12X8X.625 | N=12, Vx=8, Vy=0 | 15% |
+| 24 | HSS12X10X.500 | N=9, Vx=12, Vy=0 | 13% |
+| 25 | HSS12X4X.250 | N=9, Vx=12, Vy=0 | 26% |
+| 26 | HSS10X8X.500 | N=9, Vx=12, Vy=0 | 17% |
+| 27 | HSS10X5X.250 | My=13 | 76% |
+| 28 | HSS10X3X.250 | My=13 | 77% |
 
 Regression conclusion for the new batch:
 
@@ -56,22 +61,46 @@ correlation. A grid search over target element lengths from `0.25 in` to
 `4` to `12` left the weld-metal RMS deviation at approximately `56.8%`.
 This means the mismatch is not primarily a mesh-density problem.
 
-Implemented correlation layer:
+Implemented simplified mechanics trend layer:
 
 The app now reports two separate local weld numbers:
 - **Code DCR**: AISC Manual Part 8 elastic weld-line demand with AISC J2/J4
   strengths; `kds = 1.0` remains locked for the governing code check.
-- **CBFEM-correlated weld DCR**: an informational weld-metal-only value that
-  applies Hilti's directional weld strength term and a code-owned benchmark
-  factor for the recognized load family/profile/load combination.
+- **CBFEM trend weld DCR**: an informational weld-metal-only value that
+  recalculates element demand from a deterministic V/N/M localization model.
+  The supported envelope is vertical/downward shear `V`, axial tension `N`, and
+  bending moment `Mu`. Out-of-plane shear and out-of-plane moment are
+  intentionally excluded from this simplified check.
 
-For exact reports `(7)` through `(23)`, the benchmark factor is exact and the
-implemented CBFEM-correlated weld DCR has `0.02%` RMS deviation from the Hilti
-weld table. For non-exact inputs, the factor is interpolated from nearest
-same-family benchmarks and the report/UI emits a warning. This is intentionally
-not a CBFEM solver: it does not model anchors, plate finite elements, contact,
-or nonlinear weld behavior. It is an auditable Hilti-benchmark correlation on
-top of the existing AISC weld-line method.
+The exact-report lookup/interpolation model was removed because reports
+`(24)` through `(28)` showed it did not predict new configurations. It produced
+about `95%` RMS deviation on those five out-of-sample reports. The earlier
+predictive coefficient model reduced this to roughly `18%` RMS, but it still
+behaved like a post-processing factor. The current simplified mechanics model
+instead changes the element demand distribution before the weld strength check:
+- normalized end kernels concentrate demand near weld chord ends,
+- vertical shear is redistributed to the HSS web welds using bounded web
+  participation,
+- plate-flexibility amplification is bounded and based on HSS aspect,
+  slenderness, thickness, and applied demand,
+- small-weld/plate-stiffness amplification activates for weld legs at or below
+  `0.25 in`, capturing the increased local concentration seen in reports
+  `(31)` through `(50)`,
+- a separate small-weld shear diffusion term is used for long-side downward
+  shear because the new Hilti reports show this load path spreads differently
+  than axial pull-off.
+
+For the simplified V/N/M-supported Hilti reports `(7)` through `(11)`, `(14)`
+through `(19)`, and `(27)` through `(28)`, the current RMS deviation remains
+about `7.4%`, with maximum absolute deviation about `14.3%`. For the new
+supported reports `(31)` and `(33)` through `(50)`, Hilti's global `Vx` is the
+downward shear along the HSS long side for the report orientation and is mapped
+to the calculator's supported `V` input. New-set RMS is about `4.4%`, with
+maximum absolute deviation about `9.7%`. Combined supported RMS is about `5.8%`.
+
+This is intentionally not a CBFEM solver: it does not model anchors, plate
+finite elements, contact, or nonlinear weld behavior. It is an auditable
+mechanics trend check on top of the existing AISC weld-line method.
 
 ## Summary Table — Post CBFEM-Alignment Pass (Stages A + B + C)
 

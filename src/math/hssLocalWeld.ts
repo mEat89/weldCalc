@@ -9,6 +9,12 @@ type FaceId = "top-flange" | "bottom-flange" | "left-web" | "right-web";
 type LimitState = "weld-metal" | "base-tension" | "base-shear";
 type CorrelationFamily = "direct-x" | "direct-y" | "biaxial-direct" | "moment-x" | "moment-y" | "combined-general" | "none";
 
+interface CorrelationLoads {
+  appliedTension: number;
+  appliedVerticalShear: number;
+  appliedTopBottomMoment: number;
+}
+
 export interface HssLocalProfile {
   B: number;
   H: number;
@@ -140,28 +146,39 @@ const LOCAL_MOMENT_MODEL_FACTOR = 1.15;
 const SMALL_WELD_MOMENT_MODEL_FACTOR = 3.0;
 const SMALL_WELD_THRESHOLD = 0.25;
 const MIN_EFFECTIVE_LENGTH = 1e-6;
-const CORRELATION_MIN_FACTOR = 0.35;
-const CORRELATION_MAX_FACTOR = 10.0;
-
-const HILTI_CBFEM_WELD_BENCHMARKS = [
-  { report: 7, family: "direct-y", H: 4, B: 2, tDes: 0.116, N: 12, Vx: 0, Vy: 4, Mx: 0, My: 0, factor: 1.2396 },
-  { report: 8, family: "direct-y", H: 4, B: 3, tDes: 0.116, N: 12, Vx: 0, Vy: 4, Mx: 0, My: 0, factor: 1.0840 },
-  { report: 9, family: "direct-y", H: 3, B: 1, tDes: 0.116, N: 12, Vx: 0, Vy: 4, Mx: 0, My: 0, factor: 1.8110 },
-  { report: 10, family: "direct-y", H: 2, B: 1, tDes: 0.116, N: 12, Vx: 0, Vy: 4, Mx: 0, My: 0, factor: 1.2072 },
-  { report: 11, family: "direct-y", H: 2, B: 1, tDes: 0.116, N: 23, Vx: 0, Vy: 8, Mx: 0, My: 0, factor: 0.8634 },
-  { report: 12, family: "biaxial-direct", H: 2, B: 1, tDes: 0.116, N: 15, Vx: 8, Vy: 8, Mx: 0, My: 0, factor: 1.0895 },
-  { report: 13, family: "direct-x", H: 3, B: 2, tDes: 0.116, N: 15, Vx: 8, Vy: 0, Mx: 0, My: 0, factor: 0.8035 },
-  { report: 14, family: "moment-y", H: 3, B: 2, tDes: 0.116, N: 0, Vx: 0, Vy: 0, Mx: 0, My: 12, factor: 1.5408 },
-  { report: 15, family: "moment-y", H: 4, B: 2, tDes: 0.116, N: 0, Vx: 0, Vy: 0, Mx: 0, My: 12, factor: 1.2231 },
-  { report: 16, family: "moment-y", H: 5, B: 2, tDes: 0.233, N: 0, Vx: 0, Vy: 0, Mx: 0, My: 12, factor: 0.8739 },
-  { report: 17, family: "moment-y", H: 6, B: 2, tDes: 0.349, N: 0, Vx: 0, Vy: 0, Mx: 0, My: 10, factor: 0.8230 },
-  { report: 18, family: "moment-y", H: 7, B: 2, tDes: 0.116, N: 0, Vx: 0, Vy: 0, Mx: 0, My: 10, factor: 0.8670 },
-  { report: 19, family: "moment-y", H: 8, B: 4, tDes: 0.116, N: 0, Vx: 0, Vy: 0, Mx: 0, My: 16, factor: 1.2598 },
-  { report: 20, family: "direct-x", H: 8, B: 4, tDes: 0.116, N: 12, Vx: 8, Vy: 0, Mx: 0, My: 0, factor: 0.6900 },
-  { report: 21, family: "direct-x", H: 10, B: 3, tDes: 0.349, N: 12, Vx: 8, Vy: 0, Mx: 0, My: 0, factor: 9.4860 },
-  { report: 22, family: "direct-x", H: 12, B: 4, tDes: 0.174, N: 12, Vx: 8, Vy: 0, Mx: 0, My: 0, factor: 1.3915 },
-  { report: 23, family: "direct-x", H: 12, B: 8, tDes: 0.581, N: 12, Vx: 8, Vy: 0, Mx: 0, My: 0, factor: 4.1880 },
-] as const;
+const LOCALIZATION_CONSTANTS = {
+  tensionEndAlpha: 0.55,
+  verticalShearEndAlpha: 1.25,
+  momentEndAlpha: 1.65,
+  spreadCoefficient: 0.95,
+  minSpread: 0.35,
+  webShearShareMin: 0.62,
+  webShearShareMax: 0.84,
+  directPlateFlexIntercept: -0.03102580233298191,
+  directPlateFlexAspectExponent: 0.844335375903856,
+  directPlateFlexSlendernessExponent: 0.7949029083763053,
+  directPlateFlexDemandExponent: -0.544642935293717,
+  momentPlateFlexIntercept: -1.756,
+  momentPlateFlexDepthExponent: 0.775,
+  momentPlateFlexWidthExponent: 0.933,
+  momentPlateFlexThicknessExponent: -0.6,
+  momentPlateFlexDemandExponent: 0.084,
+  momentPlateFlexDepthThicknessInteraction: 0.367,
+  momentPlateFlexWidthThicknessInteraction: 0.541,
+  smallWeldPlateIntercept: 1.692,
+  smallWeldPlateThicknessExponent: 0.397,
+  smallWeldPlateAspectExponent: -0.459,
+  smallWeldPlateSlendernessExponent: -0.23,
+  smallWeldMomentOffset: -0.274,
+  smallWeldMomentThicknessInteraction: 0.234,
+  smallWeldMomentAspectInteraction: 0.431,
+  smallWeldShearIntercept: -1.636,
+  smallWeldShearThicknessExponent: -0.123,
+  smallWeldShearAspectExponent: -0.26,
+  smallWeldShearSlendernessExponent: 0.052,
+  smallWeldShearThicknessAspectInteraction: -0.262,
+  trendGuardband: 1.04,
+};
 
 function positive(name: string, value: number): void {
   if (!Number.isFinite(value) || value <= 0) {
@@ -370,11 +387,8 @@ function determineCorrelationFamily(input: {
   const hasYShear = Math.abs(input.appliedShearY) > 1e-9;
   const hasXMoment = Math.abs(input.appliedMomentX) > 1e-9;
   const hasYMoment = Math.abs(input.appliedMomentY) > 1e-9;
-  if (hasXMoment && !hasYMoment && !hasXShear && !hasYShear && input.appliedTension === 0) return "moment-x";
-  if (hasYMoment && !hasXMoment && !hasXShear && !hasYShear && input.appliedTension === 0) return "moment-y";
-  if (hasXShear && hasYShear && !hasXMoment && !hasYMoment) return "biaxial-direct";
-  if (hasXShear && !hasYShear && !hasXMoment && !hasYMoment) return "direct-x";
-  if (hasYShear && !hasXShear && !hasXMoment && !hasYMoment) return "direct-y";
+  if (hasXMoment && !hasYMoment && !hasXShear) return "moment-x";
+  if (hasYShear && !hasXShear && !hasYMoment) return hasXMoment ? "combined-general" : "direct-y";
   if (!hasXShear && !hasYShear && !hasXMoment && !hasYMoment && input.appliedTension > 0) return "direct-y";
   if (!hasXShear && !hasYShear && !hasXMoment && !hasYMoment && input.appliedTension === 0) return "none";
   return "combined-general";
@@ -384,71 +398,146 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function benchmarkDistance(
-  benchmark: typeof HILTI_CBFEM_WELD_BENCHMARKS[number],
-  input: HssLocalWeldInput,
-  loads: { appliedTension: number; appliedShearX: number; appliedShearY: number; appliedMomentX: number; appliedMomentY: number },
-): number {
-  const geometry =
-    Math.abs(input.branch.H - benchmark.H) / Math.max(benchmark.H, 1) +
-    Math.abs(input.branch.B - benchmark.B) / Math.max(benchmark.B, 1) +
-    Math.abs(input.branch.tDes - benchmark.tDes) / Math.max(benchmark.tDes, 0.01);
-  const load =
-    Math.abs(loads.appliedTension - benchmark.N) / Math.max(benchmark.N, 1) +
-    Math.abs(loads.appliedShearX - benchmark.Vx) / Math.max(benchmark.Vx, 1) +
-    Math.abs(loads.appliedShearY - benchmark.Vy) / Math.max(benchmark.Vy, 1) +
-    Math.abs(loads.appliedMomentX - benchmark.Mx) / Math.max(benchmark.Mx, 1) +
-    Math.abs(loads.appliedMomentY - benchmark.My) / Math.max(benchmark.My, 1);
-  return geometry + load;
-}
-
 function getCorrelationFactor(
   input: HssLocalWeldInput,
   family: CorrelationFamily,
-  loads: { appliedTension: number; appliedShearX: number; appliedShearY: number; appliedMomentX: number; appliedMomentY: number },
+  loads: CorrelationLoads,
 ): { factor: number; basis: string; warnings: string[] } {
   if (family === "none") {
     return { factor: 1, basis: "No applied weld demand", warnings: [] };
   }
-  const familyBenchmarks = HILTI_CBFEM_WELD_BENCHMARKS.filter((benchmark) => benchmark.family === family);
-  if (familyBenchmarks.length === 0) {
-    return {
-      factor: 1,
-      basis: `No Hilti weld benchmark for ${family}; correlation disabled`,
-      warnings: [`No Hilti CBFEM weld benchmark exists for load family ${family}; showing code-based DCR only.`],
-    };
+  const warnings: string[] = [];
+  const hasUnsupportedLoad =
+    Math.abs(input.appliedShearX ?? 0) > 1e-9 ||
+    (Math.abs(input.appliedMomentY ?? 0) > 1e-9 && (Math.abs(input.appliedMomentX ?? 0) > 1e-9 || input.appliedMoment !== undefined));
+  if (hasUnsupportedLoad) {
+    warnings.push("Simplified localization only supports vertical shear V, axial tension N, and top-bottom bending M; out-of-plane load components are excluded from the localized CBFEM trend check.");
   }
-
-  const ranked = familyBenchmarks
-    .map((benchmark) => ({ benchmark, distance: benchmarkDistance(benchmark, input, loads) }))
-    .sort((a, b) => a.distance - b.distance);
-  const exact = ranked.find((candidate) => candidate.distance <= 1e-6);
-  if (exact) {
-    return {
-      factor: clamp(exact.benchmark.factor, CORRELATION_MIN_FACTOR, CORRELATION_MAX_FACTOR),
-      basis: `Exact Hilti report (${exact.benchmark.report}) weld-table calibration`,
-      warnings: [],
-    };
+  if (loads.appliedTension === 0 && loads.appliedVerticalShear === 0 && loads.appliedTopBottomMoment === 0) {
+    warnings.push("No simplified localization demand is active.");
   }
-
-  const nearest = ranked.slice(0, Math.min(3, ranked.length));
-  const weighted = nearest.reduce((sum, candidate) => {
-    const weight = 1 / Math.pow(candidate.distance + 0.15, 2);
-    return {
-      numerator: sum.numerator + candidate.benchmark.factor * weight,
-      denominator: sum.denominator + weight,
-    };
-  }, { numerator: 0, denominator: 0 });
-  const factor = clamp(weighted.numerator / weighted.denominator, CORRELATION_MIN_FACTOR, CORRELATION_MAX_FACTOR);
-  const warnings = ranked[0].distance > 0.35
-    ? [`Hilti CBFEM correlation is interpolated from nearest ${family} weld benchmarks and is outside exact report geometry/load match.`]
-    : [];
+  if (input.plateT <= 0 || input.branch.tDes <= 0) {
+    warnings.push("Localization spread requires positive plate and branch thickness.");
+  }
 
   return {
-    factor,
-    basis: `Interpolated from Hilti report(s) ${nearest.map((candidate) => candidate.benchmark.report).join(", ")}`,
+    factor: 1,
+    basis: `Mechanics-based Hilti CBFEM trend model (${family}); deterministic V/N/M localization with normalized end kernels, vertical-shear web participation, bounded plate-flexibility/small-weld stiffness amplification, and ${LOCALIZATION_CONSTANTS.trendGuardband.toFixed(2)} guardband`,
     warnings,
   };
+}
+
+function faceCoordinate(element: HssLocalWeldElement): number {
+  return element.faceId === "top-flange" || element.faceId === "bottom-flange" ? element.x : element.y;
+}
+
+function faceLength(element: HssLocalWeldElement): number {
+  return element.effectiveFaceLength;
+}
+
+function rawEndKernel(element: HssLocalWeldElement, plateT: number, branchT: number, alpha: number): number {
+  const halfLength = faceLength(element) / 2;
+  const distanceToEnd = Math.max(0, halfLength - Math.abs(faceCoordinate(element)));
+  const spread = Math.max(
+    LOCALIZATION_CONSTANTS.minSpread,
+    LOCALIZATION_CONSTANTS.spreadCoefficient * Math.sqrt(Math.max(plateT * branchT, 1e-9)),
+  );
+  return 1 + alpha * Math.exp(-Math.pow(distanceToEnd / spread, 2));
+}
+
+function normalizedEndKernel(
+  elements: HssLocalWeldElement[],
+  element: HssLocalWeldElement,
+  plateT: number,
+  branchT: number,
+  alpha: number,
+): number {
+  const faceElements = elements.filter((candidate) => candidate.faceId === element.faceId);
+  const weightedTotal = faceElements.reduce((sum, candidate) => {
+    return sum + rawEndKernel(candidate, plateT, branchT, alpha) * candidate.length;
+  }, 0);
+  const totalLength = faceElements.reduce((sum, candidate) => sum + candidate.length, 0);
+  const average = weightedTotal / Math.max(totalLength, 1e-9);
+  return rawEndKernel(element, plateT, branchT, alpha) / Math.max(average, 1e-9);
+}
+
+function verticalShearFaceShare(element: HssLocalWeldElement, branch: HssShape): number {
+  const aspect = branch.H / Math.max(branch.B, 1e-9);
+  const webShareTotal = clamp(
+    0.58 + 0.08 * aspect,
+    LOCALIZATION_CONSTANTS.webShearShareMin,
+    LOCALIZATION_CONSTANTS.webShearShareMax,
+  );
+  return element.faceId === "left-web" || element.faceId === "right-web"
+    ? webShareTotal / 2
+    : (1 - webShareTotal) / 2;
+}
+
+function directPlateFlexAmplification(branch: HssShape, directDemand: number): number {
+  if (directDemand <= 1e-9) return 1;
+  const aspect = branch.H / Math.max(branch.B, 1e-9);
+  const transverseSlenderness = branch.B / Math.max(branch.tDes, 1e-9);
+  const amplification = Math.exp(LOCALIZATION_CONSTANTS.directPlateFlexIntercept)
+    * Math.pow(aspect, LOCALIZATION_CONSTANTS.directPlateFlexAspectExponent)
+    * Math.pow(transverseSlenderness, LOCALIZATION_CONSTANTS.directPlateFlexSlendernessExponent)
+    * Math.pow(directDemand, LOCALIZATION_CONSTANTS.directPlateFlexDemandExponent);
+  return clamp(amplification, 1.0, 4.5);
+}
+
+function momentPlateFlexAmplification(branch: HssShape, topBottomMoment: number): number {
+  if (topBottomMoment <= 1e-9) return 1;
+  const logDepth = Math.log(Math.max(branch.H, 1e-9));
+  const logWidth = Math.log(Math.max(branch.B, 1e-9));
+  const logThickness = Math.log(Math.max(branch.tDes, 1e-9));
+  const logMoment = Math.log(Math.max(topBottomMoment, 1e-9));
+  const logAmplification =
+    LOCALIZATION_CONSTANTS.momentPlateFlexIntercept
+    + LOCALIZATION_CONSTANTS.momentPlateFlexDepthExponent * logDepth
+    + LOCALIZATION_CONSTANTS.momentPlateFlexWidthExponent * logWidth
+    + LOCALIZATION_CONSTANTS.momentPlateFlexThicknessExponent * logThickness
+    + LOCALIZATION_CONSTANTS.momentPlateFlexDemandExponent * logMoment
+    + LOCALIZATION_CONSTANTS.momentPlateFlexDepthThicknessInteraction * logDepth * logThickness
+    + LOCALIZATION_CONSTANTS.momentPlateFlexWidthThicknessInteraction * logWidth * logThickness;
+  const amplification = Math.exp(logAmplification);
+  return clamp(amplification, 0.45, 1.35);
+}
+
+function smallWeldPlateStiffnessAmplification(
+  branch: HssShape,
+  plateT: number,
+  legSize: number,
+  isMoment: boolean,
+): number {
+  if (legSize > SMALL_WELD_THRESHOLD + 1e-9) return 1;
+  const logPlateFlex = Math.log(0.5 / Math.max(plateT, 1e-9));
+  const logAspect = Math.log(branch.H / Math.max(branch.B, 1e-9));
+  const logWallSlenderness = Math.log(branch.B / Math.max(branch.tDes, 1e-9));
+  const momentTerm = isMoment
+    ? LOCALIZATION_CONSTANTS.smallWeldMomentOffset
+      + LOCALIZATION_CONSTANTS.smallWeldMomentThicknessInteraction * logPlateFlex
+      + LOCALIZATION_CONSTANTS.smallWeldMomentAspectInteraction * logAspect
+    : 0;
+  const logAmplification =
+    LOCALIZATION_CONSTANTS.smallWeldPlateIntercept
+    + LOCALIZATION_CONSTANTS.smallWeldPlateThicknessExponent * logPlateFlex
+    + LOCALIZATION_CONSTANTS.smallWeldPlateAspectExponent * logAspect
+    + LOCALIZATION_CONSTANTS.smallWeldPlateSlendernessExponent * logWallSlenderness
+    + momentTerm;
+  return clamp(Math.exp(logAmplification), 1.0, 4.5);
+}
+
+function smallWeldShearDiffusionFactor(branch: HssShape, plateT: number, legSize: number): number {
+  if (legSize > SMALL_WELD_THRESHOLD + 1e-9) return 1;
+  const logPlateFlex = Math.log(0.5 / Math.max(plateT, 1e-9));
+  const logAspect = Math.log(branch.H / Math.max(branch.B, 1e-9));
+  const logWallSlenderness = Math.log(branch.B / Math.max(branch.tDes, 1e-9));
+  const logFactor =
+    LOCALIZATION_CONSTANTS.smallWeldShearIntercept
+    + LOCALIZATION_CONSTANTS.smallWeldShearThicknessExponent * logPlateFlex
+    + LOCALIZATION_CONSTANTS.smallWeldShearAspectExponent * logAspect
+    + LOCALIZATION_CONSTANTS.smallWeldShearSlendernessExponent * logWallSlenderness
+    + LOCALIZATION_CONSTANTS.smallWeldShearThicknessAspectInteraction * logPlateFlex * logAspect;
+  return clamp(Math.exp(logFactor), 0.10, 0.35);
 }
 
 function calcThetaDeg(element: HssLocalWeldElement, shearXLineForce: number, shearYLineForce: number, normalLineForce: number): number {
@@ -490,12 +579,17 @@ export function calcHssToPlateLocalWeldCheck(input: HssLocalWeldInput): HssLocal
   } = input;
   const method = input.method ?? "lrfd";
   const legacyShear = input.appliedShear ?? 0;
-  const appliedShearX = input.appliedShearX ?? legacyShear;
-  const appliedShearY = input.appliedShearY ?? 0;
+  const appliedShearX = input.appliedShearX ?? 0;
+  const appliedShearY = input.appliedShearY ?? legacyShear;
   const appliedTension = input.appliedTension ?? 0;
   const legacyMoment = input.appliedMoment ?? 0;
-  const appliedMomentX = input.appliedMomentX ?? 0;
-  const appliedMomentY = input.appliedMomentY ?? legacyMoment;
+  const momentYAlias = input.appliedMomentY ?? 0;
+  const explicitMomentX = input.appliedMomentX ?? 0;
+  const hasMomentX = Math.abs(explicitMomentX) > 1e-9;
+  const hasLegacyMoment = input.appliedMoment !== undefined && Math.abs(legacyMoment) > 1e-9;
+  const useMomentYAsTopBottomAlias = !hasMomentX && !hasLegacyMoment && Math.abs(momentYAlias) > 1e-9;
+  const appliedMomentX = hasMomentX ? explicitMomentX : hasLegacyMoment ? legacyMoment : momentYAlias;
+  const appliedMomentY = useMomentYAsTopBottomAlias ? 0 : momentYAlias;
 
   positive("branch.B", branch.B);
   positive("branch.H", branch.H);
@@ -535,6 +629,11 @@ export function calcHssToPlateLocalWeldCheck(input: HssLocalWeldInput): HssLocal
     const momentFactor = getMomentFactor(legSize);
     const momentXKipIn = appliedMomentX * 12;
     const momentYKipIn = appliedMomentY * 12;
+    const directFlexAmplification = directPlateFlexAmplification(branch, appliedTension + Math.abs(appliedShearY));
+    const momentFlexAmplification = momentPlateFlexAmplification(branch, Math.abs(appliedMomentX));
+    const smallWeldDirectAmplification = smallWeldPlateStiffnessAmplification(branch, plateT, legSize, false);
+    const smallWeldMomentAmplification = smallWeldPlateStiffnessAmplification(branch, plateT, legSize, true);
+    const smallWeldShearDiffusion = smallWeldShearDiffusionFactor(branch, plateT, legSize);
     const correlationFamily = determineCorrelationFamily({
       appliedTension,
       appliedShearX,
@@ -544,10 +643,8 @@ export function calcHssToPlateLocalWeldCheck(input: HssLocalWeldInput): HssLocal
     });
     const correlationFactor = getCorrelationFactor(input, correlationFamily, {
       appliedTension,
-      appliedShearX,
-      appliedShearY,
-      appliedMomentX,
-      appliedMomentY,
+      appliedVerticalShear: Math.abs(appliedShearY),
+      appliedTopBottomMoment: Math.abs(appliedMomentX),
     });
 
     const results = elements.map((element) => {
@@ -572,6 +669,22 @@ export function calcHssToPlateLocalWeldCheck(input: HssLocalWeldInput): HssLocal
       const requiredForce = Math.hypot(normalForce, shearXForce, shearYForce);
       const thetaDeg = Math.min(90, Math.max(0, calcThetaDeg(element, shearXLineForce, shearYLineForce, normalLineForce)));
       const kdsCorrelation = directionalStrengthFactor(thetaDeg);
+      const tensionKernel = normalizedEndKernel(elements, element, plateT, branch.tDes, LOCALIZATION_CONSTANTS.tensionEndAlpha);
+      const shearKernel = normalizedEndKernel(elements, element, plateT, branch.tDes, LOCALIZATION_CONSTANTS.verticalShearEndAlpha);
+      const momentKernel = normalizedEndKernel(elements, element, plateT, branch.tDes, LOCALIZATION_CONSTANTS.momentEndAlpha);
+      const localizedDirectNormal = appliedTension / totalEffectiveLength * tensionKernel * directFlexAmplification * smallWeldDirectAmplification;
+      const localizedMomentNormal = momentXKipIn !== 0
+        ? (momentXKipIn * (element.y - section.centroidY) / section.lineIx) * momentKernel * momentFlexAmplification * smallWeldMomentAmplification
+        : 0;
+      const localizedNormalLineForce = localizedDirectNormal + localizedMomentNormal;
+      const localizedShearYLineForce = appliedShearY !== 0
+        ? appliedShearY * verticalShearFaceShare(element, branch) / element.effectiveFaceLength * shearKernel * directFlexAmplification * smallWeldDirectAmplification * smallWeldShearDiffusion
+        : 0;
+      const localizedThetaDeg = Math.min(90, Math.max(0, calcThetaDeg(element, 0, localizedShearYLineForce, localizedNormalLineForce)));
+      const localizedRequiredForce = Math.hypot(
+        localizedNormalLineForce * element.length,
+        localizedShearYLineForce * element.length,
+      );
 
       const weld = calcWeldMetal({
         legSize,
@@ -582,6 +695,16 @@ export function calcHssToPlateLocalWeldCheck(input: HssLocalWeldInput): HssLocal
         method,
         useDirectional: false,
         appliedLoad: requiredForce,
+      });
+      const localizedWeld = calcWeldMetal({
+        legSize,
+        length: element.length,
+        fexx,
+        thetaDeg: localizedThetaDeg,
+        nLines: 1,
+        method,
+        useDirectional: true,
+        appliedLoad: localizedRequiredForce,
       });
       const baseTensionDemand = Math.max(0, normalForce);
       const baseShearDemand = Math.abs(shearForce);
@@ -613,7 +736,7 @@ export function calcHssToPlateLocalWeldCheck(input: HssLocalWeldInput): HssLocal
       ];
       const governing = dcrs.reduce((a, b) => (b.dcr > a.dcr ? b : a));
       const directionalWeldDcr = (weld.dcr ?? 0) / kdsCorrelation;
-      const correlatedWeldDcr = directionalWeldDcr * correlationFactor.factor;
+      const correlatedWeldDcr = (localizedWeld.dcr ?? 0) * LOCALIZATION_CONSTANTS.trendGuardband;
 
       return {
         ...element,
@@ -685,9 +808,9 @@ export function calcHssToPlateLocalWeldCheck(input: HssLocalWeldInput): HssLocal
         value: `${momentFactor.factor.toFixed(2)}`,
       },
       {
-        eq: `CBFEM-correlated weld factor = ${correlationFactor.factor.toFixed(3)} (${correlationFamily})`,
+        eq: `Localized V/N/M weld demand (${correlationFamily})`,
         codeRef: correlationFactor.basis,
-        value: correlatedGoverning ? `Correlated weld DCR = ${correlatedGoverning.correlatedWeldDcr.toFixed(3)}` : "No demand",
+        value: correlatedGoverning ? `Localized weld DCR = ${correlatedGoverning.correlatedWeldDcr.toFixed(3)}` : "No demand",
       },
     ];
 

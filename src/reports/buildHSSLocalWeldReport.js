@@ -38,8 +38,8 @@ export function buildHSSLocalWeldReport({ state, calcs, meta, diagramSvgString }
   assertReportInputs({ state, calcs });
   const {
     branch, branchGrade, plateT, plateGrade, legSize, fexx,
-    appliedShear, appliedShearX, appliedShearY, appliedTension,
-    appliedMip, appliedMomentX, appliedMomentY, analysisMode,
+    appliedShear, appliedShearY, appliedTension,
+    appliedMip, appliedMomentX, analysisMode,
   } = state;
   const { local, localError, group } = calcs;
   const governing = local?.governing ?? null;
@@ -67,7 +67,7 @@ export function buildHSSLocalWeldReport({ state, calcs, meta, diagramSvgString }
         { label: "Leg size, w", value: toFraction(legSize), extra: to16ths(legSize) },
         { label: "Electrode", value: `E${fexx}` },
         { label: "Directional factor", value: "kds = 1.0 locked" },
-        { label: "CBFEM-correlated weld factor", value: local ? `${local.correlation.factor.toFixed(3)} (${local.correlation.family})` : "Not computed" },
+        { label: "CBFEM trend model", value: local ? `${local.correlation.family}` : "Not computed" },
         { label: "Element mesh", value: local ? `${local.mesh.totalElements} read-only elements` : "Not computed" },
         { label: "Moment local model factor", value: local ? local.modelFactors.moment.toFixed(2) : "—" },
       ],
@@ -75,11 +75,11 @@ export function buildHSSLocalWeldReport({ state, calcs, meta, diagramSvgString }
     {
       group: "Applied loads",
       rows: [
-        { label: "Shear resultant, Vu", value: appliedShear > 0 ? `${appliedShear.toFixed(2)} kips` : "0 (no demand)" },
-        { label: "Directional shear", value: `Vx = ${(appliedShearX ?? appliedShear ?? 0).toFixed(2)} kips, Vy = ${(appliedShearY ?? 0).toFixed(2)} kips` },
+        { label: "Downward shear, Vu", value: appliedShear > 0 ? `${appliedShear.toFixed(2)} kips` : "0 (no demand)" },
+        { label: "Simplified shear components", value: `Vx excluded, Vy = ${(appliedShearY ?? appliedShear ?? 0).toFixed(2)} kips` },
         { label: "Tension, Nu", value: appliedTension > 0 ? `${appliedTension.toFixed(2)} kips` : "0 (no demand)" },
-        { label: "Moment resultant, Mu", value: appliedMip > 0 ? `${appliedMip.toFixed(2)} ft-kips` : "0 (no demand)" },
-        { label: "Directional moment", value: `Mx = ${(appliedMomentX ?? 0).toFixed(2)} ft-kips, My = ${(appliedMomentY ?? appliedMip ?? 0).toFixed(2)} ft-kips` },
+        { label: "Bending moment, Mu", value: appliedMip > 0 ? `${appliedMip.toFixed(2)} ft-kips` : "0 (no demand)" },
+        { label: "Moment used in local trend", value: `Mu = ${(appliedMomentX ?? appliedMip ?? 0).toFixed(2)} ft-kips` },
       ],
     },
   ];
@@ -92,7 +92,7 @@ export function buildHSSLocalWeldReport({ state, calcs, meta, diagramSvgString }
       status: governing.status === "OK" ? "pass" : "fail",
     });
     results.push({
-      label: `CBFEM-correlated weld utilization — ${local.correlation.governingElementId || "n/a"}`,
+      label: `CBFEM trend weld utilization — ${local.correlation.governingElementId || "n/a"}`,
       value: `${pct(local.correlation.governingDcr)} (${local.correlation.basis})`,
       status: local.correlation.status === "OK" ? "pass" : "fail",
     });
@@ -129,7 +129,7 @@ export function buildHSSLocalWeldReport({ state, calcs, meta, diagramSvgString }
         { label: "Be local", value: `${local.section.be.toFixed(3)} in` },
         { label: "Effective perimeter", value: `${local.mesh.totalEffectiveLength.toFixed(3)} in` },
         { label: "Envelope", value: local.validation.envelope },
-        { label: "CBFEM-corr. weld", value: local.correlation.governingDcr.toFixed(3) },
+        { label: "CBFEM trend weld", value: local.correlation.governingDcr.toFixed(3) },
       ],
       verdict: governing ? {
         status: governing.status,
@@ -142,9 +142,9 @@ export function buildHSSLocalWeldReport({ state, calcs, meta, diagramSvgString }
 
     if (local.correlation.warnings.length > 0) {
       checks.push({
-        title: "CBFEM Correlation Warning",
-        codeRef: "Hilti benchmark interpolation guardrail",
-        steps: local.correlation.warnings.map((warning) => ({ eq: "Correlation note", codeRef: local.correlation.basis, value: warning })),
+        title: "CBFEM Trend Warning",
+        codeRef: "Hilti benchmark trend guardrail",
+        steps: local.correlation.warnings.map((warning) => ({ eq: "Trend note", codeRef: local.correlation.basis, value: warning })),
         statCards: [
           { label: "Family", value: local.correlation.family },
           { label: "Factor", value: local.correlation.factor.toFixed(3) },

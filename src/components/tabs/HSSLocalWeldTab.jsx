@@ -9,7 +9,7 @@ import { calcWeldSize, toFraction, to16ths } from "../../math/weldMath";
 import { calcHssToPlateLocalWeldCheck } from "../../math/hssLocalWeld";
 import { useHSSCalculation } from "./useHSSCalculation";
 import { Field, HssMemberSelect, NonNegativeNumberInput, PlateThicknessSelect, SteelGradeSelect } from "../shared/FormElements";
-import { CheckBlock, CombinedLoadingCard, GroupCapacityCard, StatCard, WarningBanner } from "../shared/CheckResults";
+import { CheckBlock, CombinedLoadingCard, GroupCapacityCard, StatCard } from "../shared/CheckResults";
 import HssSvgDiagram from "../shared/HssSvgDiagram";
 import ReportActions from "../shared/ReportActions";
 import { buildHSSLocalWeldReport } from "../../reports/buildHSSLocalWeldReport";
@@ -64,7 +64,7 @@ function LocalGoverningCard({ local }) {
         { label: "Element", value: gov.id },
         { label: "Limit state", value: limitStateLabel(gov.governingLimitState) },
         { label: "Local DCR", value: gov.governingDcr.toFixed(3) },
-        { label: "CBFEM-correlated weld", value: local.correlation.governingDcr.toFixed(3) },
+        { label: "CBFEM trend weld", value: local.correlation.governingDcr.toFixed(3) },
       ]}
       checkProps={{
         status: gov.status,
@@ -126,7 +126,7 @@ function SegmentDetailTable({ local }) {
               <th style={{ padding: "6px" }}>Force</th>
               <th style={{ padding: "6px" }}>Theta</th>
               <th style={{ padding: "6px" }}>Weld</th>
-              <th style={{ padding: "6px" }}>CBFEM-corr.</th>
+              <th style={{ padding: "6px" }}>CBFEM trend</th>
               <th style={{ padding: "6px" }}>Base T</th>
               <th style={{ padding: "6px" }}>Base V</th>
               <th style={{ padding: "6px" }}>Gov</th>
@@ -174,19 +174,19 @@ export default function HSSLocalWeldTab({
   const [plateGradeIdx, setPlateGradeIdx] = useState(0);
   const [legSize, setLegSize] = useState(0.3125);
   const [fexx, setFexx] = useState(70);
-  const [appliedShearX, setAppliedShearX] = useState(0);
   const [appliedShearY, setAppliedShearY] = useState(0);
   const [appliedTension, setAppliedTension] = useState(10);
   const [appliedMomentX, setAppliedMomentX] = useState(0);
-  const [appliedMomentY, setAppliedMomentY] = useState(0);
 
   const branch = HSS_SHAPES[branchIdx] || HSS_SHAPES[0];
   const branchGrade = STEEL_GRADES[branchGradeIdx] || STEEL_GRADES[0];
   const plateGrade = STEEL_GRADES[plateGradeIdx] || STEEL_GRADES[0];
   const branchTransverseDim = "B";
   const lengthMode = "k5";
-  const appliedShear = Math.hypot(appliedShearX, appliedShearY);
-  const appliedMip = Math.hypot(appliedMomentX, appliedMomentY);
+  const appliedShearX = 0;
+  const appliedMomentY = 0;
+  const appliedShear = appliedShearY;
+  const appliedMip = appliedMomentX;
 
   const groupCalcs = useHSSCalculation({
     connType: "hss2plate",
@@ -235,7 +235,6 @@ export default function HSSLocalWeldTab({
   }
 
   const anyLoad = appliedShear > 0 || appliedTension > 0 || appliedMip > 0;
-  const validationWarnings = [...(local?.validation?.warnings ?? []), ...(local?.correlation?.warnings ?? [])];
 
   return (
     <div className="app-layout">
@@ -396,16 +395,10 @@ export default function HSSLocalWeldTab({
                 Enter resultants at the weld group.
               </span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px" }}>
-              <div>
-                <label htmlFor="local-load-shear-x" style={{ fontSize: "11px", fontWeight: "700", color: "var(--primary-dark)", display: "block", marginBottom: "3px" }}>
-                  V<sub style={{ fontSize: "9px" }}>x</sub> (kips)
-                </label>
-                <NonNegativeNumberInput id="local-load-shear-x" value={appliedShearX} step="0.5" onChange={setAppliedShearX} className="form-input" />
-              </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
               <div>
                 <label htmlFor="local-load-shear-y" style={{ fontSize: "11px", fontWeight: "700", color: "var(--primary-dark)", display: "block", marginBottom: "3px" }}>
-                  V<sub style={{ fontSize: "9px" }}>y</sub> (kips)
+                  Downward shear, V<sub style={{ fontSize: "9px" }}>u</sub> (kips)
                 </label>
                 <NonNegativeNumberInput id="local-load-shear-y" value={appliedShearY} step="0.5" onChange={setAppliedShearY} className="form-input" />
               </div>
@@ -417,19 +410,13 @@ export default function HSSLocalWeldTab({
               </div>
               <div>
                 <label htmlFor="local-load-mx" style={{ fontSize: "11px", fontWeight: "700", color: "var(--primary-dark)", display: "block", marginBottom: "3px" }}>
-                  M<sub style={{ fontSize: "9px" }}>x</sub> (ft-kips)
+                  Bending moment, M<sub style={{ fontSize: "9px" }}>u</sub> (ft-kips)
                 </label>
                 <NonNegativeNumberInput id="local-load-mx" value={appliedMomentX} step="0.5" onChange={setAppliedMomentX} className="form-input" />
               </div>
-              <div>
-                <label htmlFor="local-load-my" style={{ fontSize: "11px", fontWeight: "700", color: "var(--primary-dark)", display: "block", marginBottom: "3px" }}>
-                  M<sub style={{ fontSize: "9px" }}>y</sub> (ft-kips)
-                </label>
-                <NonNegativeNumberInput id="local-load-my" value={appliedMomentY} step="0.5" onChange={setAppliedMomentY} className="form-input" />
-              </div>
             </div>
             <div style={{ fontSize: "10.5px", color: "var(--text-muted)", lineHeight: "1.35", padding: "6px 8px", background: "var(--surface-subtle)", borderRadius: "var(--radius-sm)" }}>
-              Local discretization uses read-only code constants. Directional loads are resolved to local weld axes; the global group comparison uses resultant shear and moment.
+              Local discretization uses read-only code constants for vertical shear V, tension N, and bending moment Mu.
             </div>
           </div>
         </div>
@@ -465,10 +452,6 @@ export default function HSSLocalWeldTab({
             <strong>Weld size calculation error:</strong> {sizeError}
           </div>
         )}
-        {validationWarnings.length > 0 && (
-          <WarningBanner title="Local model validation envelope warning" items={validationWarnings} />
-        )}
-
         {!anyLoad && (
           <div className="card" style={{ padding: "14px 18px", textAlign: "center", color: "var(--text-muted)", fontSize: "12px", lineHeight: "1.5" }}>
             Enter at least one load to run the HSS-to-plate local weld check.
@@ -523,7 +506,7 @@ export default function HSSLocalWeldTab({
             <LocalGoverningCard local={local} />
             {local && (
               <div className="card" style={{ marginTop: "8px", fontSize: "11.5px", lineHeight: "1.45", color: "var(--text-muted)" }}>
-                <strong style={{ color: "var(--text-main)" }}>Assumptions:</strong> AISC Manual Part 8 elastic weld-group demand; AISC Section J2/J4 segment strengths; code DCR keeps kds locked to 1.0; CBFEM-correlated weld DCR applies the Hilti directional weld term and benchmark factor; transverse HSS faces concentrated to Be; mesh density is read-only and regression-tested.
+                <strong style={{ color: "var(--text-main)" }}>Assumptions:</strong> AISC Manual Part 8 elastic weld-group demand; AISC Section J2/J4 segment strengths; code DCR keeps kds locked to 1.0; CBFEM trend weld DCR uses localized V/N/M demand with bounded plate-flexibility amplification; transverse HSS faces are concentrated to Be; mesh density is read-only and regression-tested.
               </div>
             )}
             <FaceSummaryGrid local={local} />

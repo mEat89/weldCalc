@@ -78,19 +78,19 @@ describe("HSS-to-plate local weld discretization", () => {
       appliedShearY: 17,
       method: "lrfd",
     });
-    const momentY = calcHssToPlateLocalWeldCheck({
+    const topBottomMoment = calcHssToPlateLocalWeldCheck({
       branch: HSS_4X4X25,
       branchGrade: A500_GR_B,
       plateT: 0.5,
       plateGrade: A36,
       legSize: 0.25,
       fexx: FEXX,
-      appliedMomentY: 10,
+      appliedMomentX: 10,
       method: "lrfd",
     });
 
     expect(shearX.governing?.thetaDeg).not.toBeCloseTo(shearY.governing?.thetaDeg ?? 0, 3);
-    expect(momentY.governing?.faceId).toMatch(/web/);
+    expect(topBottomMoment.governing?.faceId).toMatch(/flange/);
   });
 
   it("uses read-only mesh refinement without materially reducing the governing DCR", () => {
@@ -135,7 +135,7 @@ describe("HSS-to-plate local weld discretization", () => {
     expect(dcr).toBeGreaterThanOrEqual(0.34);
   });
 
-  it("reports the separate CBFEM-correlated weld DCR for exact Hilti batch cases", () => {
+  it("reports the separate mechanics-based CBFEM trend weld DCR for simplified V/N/M cases", () => {
     const result = calcHssToPlateLocalWeldCheck({
       branch: { name: "HSS4x2x1/8", B: 2, H: 4, tDes: 0.116, tNom: 0.125 },
       branchGrade: A500_GR_B,
@@ -148,9 +148,10 @@ describe("HSS-to-plate local weld discretization", () => {
       method: "lrfd",
     });
 
-    expect(result.correlation.basis).toMatch(/Exact Hilti report \(7\)/);
-    expect(result.correlation.governingDcr).toBeCloseTo(0.68, 3);
-    expect(result.governing!.governingDcr).toBeGreaterThan(result.correlation.governingDcr);
+    expect(result.correlation.basis).toMatch(/Mechanics-based Hilti CBFEM trend model/);
+    expect(result.correlation.governingDcr).toBeGreaterThan(0.65);
+    expect(result.correlation.governingDcr).toBeLessThan(0.73);
+    expect(result.correlation.family).toBe("direct-y");
   });
 
   it("is conservative against the Hilti HSS8x2 moment benchmark", () => {

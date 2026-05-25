@@ -96,17 +96,22 @@ export const HSS_SHAPES = [
   { name: "HSS8x6x1/2",   H: 8, B: 6,  tNom: 0.500, tDes: 0.465 },
   { name: "HSS10x4x1/4",  H: 10, B: 4, tNom: 0.250, tDes: 0.233 },
   { name: "HSS10x4x3/8",  H: 10, B: 4, tNom: 0.375, tDes: 0.349 },
+  { name: "HSS10x3x1/4",  H: 10, B: 3, tNom: 0.250, tDes: 0.233 },
   { name: "HSS10x3x3/8",  H: 10, B: 3, tNom: 0.375, tDes: 0.349 },
+  { name: "HSS10x5x1/4",  H: 10, B: 5, tNom: 0.250, tDes: 0.233 },
   { name: "HSS10x6x1/4",  H: 10, B: 6, tNom: 0.250, tDes: 0.233 },
   { name: "HSS10x6x3/8",  H: 10, B: 6, tNom: 0.375, tDes: 0.349 },
   { name: "HSS10x6x1/2",  H: 10, B: 6, tNom: 0.500, tDes: 0.465 },
+  { name: "HSS10x8x1/2",  H: 10, B: 8, tNom: 0.500, tDes: 0.465 },
   { name: "HSS12x4x3/16", H: 12, B: 4, tNom: 0.1875, tDes: 0.174 },
   { name: "HSS12x4x1/4",  H: 12, B: 4, tNom: 0.250, tDes: 0.233 },
+  { name: "HSS12x4x3/8",  H: 12, B: 4, tNom: 0.375, tDes: 0.349 },
   { name: "HSS12x6x3/8",  H: 12, B: 6, tNom: 0.375, tDes: 0.349 },
   { name: "HSS12x6x1/2",  H: 12, B: 6, tNom: 0.500, tDes: 0.465 },
   { name: "HSS12x8x3/8",  H: 12, B: 8, tNom: 0.375, tDes: 0.349 },
   { name: "HSS12x8x1/2",  H: 12, B: 8, tNom: 0.500, tDes: 0.465 },
   { name: "HSS12x8x5/8",  H: 12, B: 8, tNom: 0.625, tDes: 0.581 },
+  { name: "HSS12x10x1/2", H: 12, B: 10, tNom: 0.500, tDes: 0.465 },
 ];
 
 export const COMMON_PLATE_T = [
