@@ -25,6 +25,7 @@ import {
   calcMomentIpCapacity,
   calcK5GroupCapacity,
 } from "../weldMath";
+import { calcHssToPlateLocalWeldCheck } from "../hssLocalWeld";
 
 // ============================================================================
 // Common branch (used by reports 2, 4, 5 — all HSS8x2x1/8 + 0.5" plate)
@@ -418,5 +419,76 @@ describe("Summary: Hilti CBFEM vs. hand-calc deltas", () => {
     console.log("  Delta = ours − Hilti. Positive = we are MORE conservative than CBFEM (good).");
     console.log("═".repeat(78) + "\n");
     expect(true).toBe(true);
+  });
+});
+
+describe("Local discretization benchmark guardrails — one-sided Hilti checks", () => {
+  it("keeps validated local weld utilizations at or above Hilti CBFEM reports", () => {
+    const cases = [
+      {
+        label: "R5 tension HSS8x2x1/8",
+        hilti: 0.34,
+        input: {
+          branch: HSS_8x2x125,
+          branchGrade: A500_GrB,
+          plateT: PLATE_05,
+          plateGrade: A36,
+          legSize: 0.348,
+          fexx: FEXX,
+          appliedTension: 10,
+          method: "lrfd" as const,
+        },
+      },
+      {
+        label: "R4 moment HSS8x2x1/8",
+        hilti: 0.76,
+        input: {
+          branch: HSS_8x2x125,
+          branchGrade: A500_GrB,
+          plateT: PLATE_05,
+          plateGrade: A36,
+          legSize: 0.348,
+          fexx: FEXX,
+          appliedMoment: 10,
+          method: "lrfd" as const,
+        },
+      },
+      {
+        label: "R2 small-leg moment HSS8x2x1/8",
+        hilti: 2.90,
+        input: {
+          branch: HSS_8x2x125,
+          branchGrade: A500_GrB,
+          plateT: PLATE_05,
+          plateGrade: A36,
+          legSize: 0.25,
+          fexx: FEXX,
+          appliedMoment: 10,
+          method: "lrfd" as const,
+        },
+      },
+      {
+        label: "Original shear HSS4x4x1/4",
+        hilti: 0.49,
+        input: {
+          branch: { B: 4.0, H: 4.0, tDes: 0.233, tNom: 0.25 },
+          branchGrade: A500_GrB,
+          plateT: PLATE_05,
+          plateGrade: A36,
+          legSize: 0.25,
+          fexx: FEXX,
+          appliedShear: 17,
+          method: "lrfd" as const,
+        },
+      },
+    ];
+
+    for (const c of cases) {
+      const result = calcHssToPlateLocalWeldCheck(c.input);
+      const localDcr = result.governing?.governingDcr ?? 0;
+      // eslint-disable-next-line no-console
+      console.log(`[${c.label}] Hilti=${(c.hilti * 100).toFixed(0)}% local=${(localDcr * 100).toFixed(1)}%`);
+      expect(localDcr).toBeGreaterThanOrEqual(c.hilti - 1e-9);
+    }
   });
 });

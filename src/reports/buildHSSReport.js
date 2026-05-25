@@ -44,7 +44,7 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
     connType, lengthMode,
     branch, branchGrade, chord, chordGrade,
     plateT, plateGrade,
-    branchTransverseDim, legSize, fexx,
+    legSize, fexx,
     appliedShear, appliedTension, appliedMip,
   } = state;
   const { shared, shear, tension, ipMoment, k4Unity } = calcs;
@@ -70,8 +70,8 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
         ] : [
           { label: "Plate thickness, tp", value: toFraction(plateT) },
         ]),
-        { label: "Group orientation", value: `${branchTransverseDim} dimension transverse to support axis`,
-          extra: `Bb = ${transverseLen.toFixed(3)} in, Hb = ${parallelLen.toFixed(3)} in` },
+        { label: "Weld group dimensions", value: "Automatic AISC mapping",
+          extra: `B maps to Be/Bb = ${transverseLen.toFixed(3)} in; H maps to Hb = ${parallelLen.toFixed(3)} in` },
         { label: "Effective length method", value: lengthMode === "k5" ? "K5 effective width" : "AISC nominal" },
       ],
     },
@@ -191,7 +191,7 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
       const statusG = dcr === null ? null : dcr <= 1.0 ? "OK" : "NG";
       checks.push({
         title: isMoment
-          ? `${solLabel} — Total group capacity, in-plane moment (§K5-2 / K5-6)`
+          ? `${solLabel} — Total group capacity, ${connType === "hss2plate" ? "bending moment" : "in-plane moment"} (§K5-2 / K5-6)`
           : `${solLabel} — Total group capacity, axial (§K5-1 / K5-5)`,
         codeRef: isMoment
           ? "AISC 360-22 §K5 Eq. K5-2: Mn-ip = Fnw · Sip ; Eq. K5-6"
@@ -212,15 +212,17 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
         statCards: isMoment ? [
           { label: "Mn-ip nominal", value: `${nominal.toFixed(2)} kip-in` },
           { label: "φMn-ip (LRFD)", value: `${cap.toFixed(2)} kip-in` },
+          { label: "Demand", value: `${Pu_or_Mu_kip.toFixed(2)} kip-in` },
           { label: "Group DCR", value: dcr !== null ? dcr.toFixed(3) : "—" },
         ] : [
           { label: "Pn nominal", value: `${nominal.toFixed(2)} kips` },
           { label: "φPn (LRFD)", value: `${cap.toFixed(2)} kips` },
+          { label: "Demand", value: `${Pu_or_Mu_kip.toFixed(2)} kips` },
           { label: "Group DCR", value: dcr !== null ? dcr.toFixed(3) : "—" },
         ],
         verdict: statusG ? {
           status: statusG, demand: Pu_or_Mu_kip, cap, dcr,
-          label: statusG === "OK" ? "Total group capacity adequate — matches Hilti CBFEM headline %" : "Total group capacity exceeded",
+          label: statusG === "OK" ? "Total group capacity adequate" : "Total group capacity exceeded",
         } : { status: null, demand: 0, cap, dcr: null, label: "No demand entered" },
       });
     }
@@ -233,9 +235,16 @@ export function buildHSSReport({ state, calcs, meta, diagramSvgString }) {
   // ----- Final §K4-9 unity (auto-aggregated) -----
   if (k4Unity && k4Unity.hasAnyTerm) {
     checks.push({
-      title: "Final design verdict — Combined loading (§K4-9)",
+      title: "Unity Check",
       codeRef: "AISC 360-22 §K4 — Pr/Pc + Mr,ip/Mc,ip ≤ 1.0 (auto-aggregated)",
       steps: [
+        {
+          eq: connType === "hss2plate"
+            ? "Unity = max(Vu/φPn, Nu/φPn) + Mu/φMn"
+            : "Unity = max(Vu/φPn, Nu/φPn) + Mip,u/φMn-ip",
+          codeRef: "AISC §K4-9 interaction equation",
+          value: `${k4Unity.unity.toFixed(3)} ≤ 1.000`,
+        },
         { eq: "Axial / shear term: Pr/Pc", codeRef: "Worse active group DCR from current shear/tension inputs", value: k4Unity.terms.axial.toFixed(3) },
         { eq: "In-plane moment term: Mr,ip/Mc,ip", codeRef: "Current in-plane moment group DCR (Mu·12 / φMn-ip)", value: k4Unity.terms.ipMoment.toFixed(3) },
         { eq: "Unity = Σ terms", codeRef: "AISC §K4-9 interaction equation (≤ 1.0)", value: k4Unity.unity.toFixed(3) },

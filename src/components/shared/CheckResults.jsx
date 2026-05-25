@@ -140,15 +140,32 @@ export function CombinedLoadingCard({ terms, unity, status, hasAnyTerm, connType
   const momentCodeRef = connType === "hss2plate"
     ? "Current flexural weld-group bending DCR (Mu·12 / φMn)"
     : "Current in-plane moment weld-group DCR (Mu·12 / φMn-ip)";
+  const unityEquation = connType === "hss2plate"
+    ? "Unity = max(Vu/φPn, Nu/φPn) + Mu/φMn ≤ 1.0"
+    : "Unity = max(Vu/φPn, Nu/φPn) + Mip,u/φMn-ip ≤ 1.0";
+  const unityTooltipSections = [
+    {
+      text: "Combines the active group demand ratios into one interaction check. Shear and tension are both axial-type group demands, so the axial term uses the worse of Vu/φPn and Nu/φPn rather than adding both.",
+    },
+    {
+      text: connType === "hss2plate"
+        ? "Unity = max(Vu/φPn, Nu/φPn) + Mu/φMn. Loads left at zero do not contribute to the sum."
+        : "Unity = max(Vu/φPn, Nu/φPn) + Mip,u/φMn-ip. Loads left at zero do not contribute to the sum.",
+    },
+    { label: "AISC Reference", text: "AISC 360-22 §K4 interaction check, Eq. K4-9." },
+  ];
   if (!hasAnyTerm) {
     return (
       <div className="card check-block-card">
         <div className="check-block-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          <span className="header-title">Final design verdict — Combined loading (§K4-9)</span>
+          <span className="header-title">Unity Check</span>
             <span className="header-ref">AISC 360-22 §K4 — Pr/Pc + Mr,ip/Mc,ip ≤ 1.0</span>
           </div>
-          <span className="status-badge-mini" style={{ background: "var(--surface-subtle)", color: "var(--text-muted)" }}>—</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <InfoTooltip title="Unity Check — Details" sections={unityTooltipSections} align="right" />
+            <span className="status-badge-mini" style={{ background: "var(--surface-subtle)", color: "var(--text-muted)" }}>—</span>
+          </div>
         </div>
         <div style={{ padding: "8px 12px", fontSize: "11.5px", color: "var(--text-muted)", lineHeight: "1.45" }}>
           Enter at least one non-zero load (V, N, or M_ip) above. Zero loads
@@ -163,13 +180,17 @@ export function CombinedLoadingCard({ terms, unity, status, hasAnyTerm, connType
     <div className="card check-block-card">
       <div className="check-block-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          <span className="header-title">Final design verdict — Combined loading (§K4-9)</span>
+          <span className="header-title">Unity Check</span>
           <span className="header-ref">AISC 360-22 §K4 — Pr/Pc + Mr,ip/Mc,ip ≤ 1.0 (auto-aggregated)</span>
         </div>
-        <span className={`status-badge-mini ${isOk ? "pass" : "fail"}`}>{status}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <InfoTooltip title="Unity Check — Details" sections={unityTooltipSections} align="right" />
+          <span className={`status-badge-mini ${isOk ? "pass" : "fail"}`}>{status}</span>
+        </div>
       </div>
       <div className="check-block-content" style={{ marginTop: "6px", borderTop: "1px solid var(--border-color)", paddingTop: "6px" }}>
         <div className="trace-steps-container">
+          <TraceStep eq={unityEquation} codeRef="AISC §K4-9 interaction equation" value={unity.toFixed(3)} />
           <TraceStep eq={`Axial term: Pr/Pc = ${terms.axial.toFixed(3)}`} codeRef="Worse active group DCR from current shear/tension inputs" value={terms.axial.toFixed(3)} />
           <TraceStep eq={`${momentTermLabel} = ${terms.ipMoment.toFixed(3)}`} codeRef={momentCodeRef} value={terms.ipMoment.toFixed(3)} last />
         </div>
@@ -195,10 +216,9 @@ export function CombinedLoadingCard({ terms, unity, status, hasAnyTerm, connType
 /**
  * AISC §K5-1 + K5-5/K5-6 Total Group Capacity card (Check 5).
  *
- * Shows the connection-level weld-group capacity that matches Hilti CBFEM's
- * headline utilization %. For axial solicitation (shear/tension) it uses
- * Eq. K5-1 (Pn = Fnw·tw·le), for in-plane moment it uses Eq. K5-2
- * (Mn-ip = Fnw·Sip).
+ * Shows the connection-level weld-group capacity. For axial solicitation
+ * (shear/tension) it uses Eq. K5-1 (Pn = Fnw·tw·le), for in-plane moment it
+ * uses Eq. K5-2 (Mn-ip = Fnw·Sip).
  *
  * Renders as a standard collapsible CheckBlock so group result cards are
  * visually consistent with the rest of the app.
@@ -230,10 +250,34 @@ export function GroupCapacityCard({ groupCap, solicitation, appliedLoad, applied
   const dcr = demand > 0 && cap > 0 ? demand / cap : null;
   const status = dcr === null ? null : dcr <= 1.0 ? "OK" : "NG";
 
+  const axialTitlePrefix = solicitation === "shear" ? "Shear" : "Tension";
   const title = isMoment
-    ? (connType === "hss2plate" ? "Total group capacity, bending moment (§K5-2 / K5-6)" : "Total group capacity, in-plane moment (§K5-2 / K5-6)")
-    : "Total group capacity, axial (§K5-1 / K5-5)";
-  const codeRef = "Full weld-group check — matches Hilti CBFEM headline % aggregation";
+    ? (connType === "hss2plate" ? "Bending moment — total group capacity (§K5-2 / K5-6)" : "In-plane moment — total group capacity (§K5-2 / K5-6)")
+    : `${axialTitlePrefix} — total group axial capacity (§K5-1 / K5-5)`;
+  const codeRef = isMoment
+    ? "AISC 360-22 §K5 Eq. K5-2 with Eq. K5-6"
+    : "AISC 360-22 §K5 Eq. K5-1 with Eq. K5-5";
+  const tooltipSections = isMoment ? [
+    {
+      text: connType === "hss2plate"
+        ? "Checks flexural bending demand at the HSS-to-plate weld group using the total weld-group moment capacity. This is not a torsion check about the HSS longitudinal axis."
+        : "Checks in-plane bending demand at the HSS branch weld group using the total weld-group moment capacity.",
+    },
+    {
+      text: "The app computes Sip = tw·[Hb²/(3·sin²θ) + Be·Hb/sinθ], then Mn = Fnw·Sip and φMn = 0.75·Mn. The DCR is moment demand divided by φMn.",
+    },
+    { label: "AISC Reference", text: "AISC 360-22 §K5 Eq. K5-2 and Table K5.1 Eq. K5-6." },
+  ] : [
+    {
+      text: solicitation === "shear"
+        ? "Checks the entered shear resultant against the total axial-type capacity of the HSS weld group. This card uses the shear demand only."
+        : "Checks the entered axial tension resultant against the same total axial-type capacity of the HSS weld group. This card uses the tension demand only.",
+    },
+    {
+      text: "The app computes le = 2·Hb/sinθ + 2·Be, then Pn = Fnw·tw·le and φPn = 0.75·Pn. The DCR is this card's demand divided by φPn.",
+    },
+    { label: "AISC Reference", text: "AISC 360-22 §K5 Eq. K5-1 and Table K5.1 Eq. K5-5." },
+  ];
 
   const traceSteps = isMoment ? [
     { eq: `Sip = tw·[Hb²/(3·sin²θ) + Be·Hb/sinθ]`, codeRef: "AISC §K5 Eq. K5-6 — effective elastic section modulus", value: `${groupCap.Sip.toFixed(4)} in³` },
@@ -252,10 +296,12 @@ export function GroupCapacityCard({ groupCap, solicitation, appliedLoad, applied
   const statCards = isMoment ? [
     { label: "Mn-ip nominal", value: `${nominal.toFixed(2)} ${demandUnit}` },
     { label: "φMn-ip (LRFD)", value: `${cap.toFixed(2)} ${demandUnit}` },
+    { label: "Demand", value: `${demand.toFixed(2)} ${demandUnit}` },
     { label: "Group DCR", value: dcr !== null ? dcr.toFixed(3) : "—" },
   ] : [
     { label: "Pn nominal", value: `${nominal.toFixed(2)} ${demandUnit}` },
     { label: "φPn (LRFD)", value: `${cap.toFixed(2)} ${demandUnit}` },
+    { label: `${axialTitlePrefix} demand`, value: `${demand.toFixed(2)} ${demandUnit}` },
     { label: "Group DCR", value: dcr !== null ? dcr.toFixed(3) : "—" },
   ];
 
@@ -276,6 +322,7 @@ export function GroupCapacityCard({ groupCap, solicitation, appliedLoad, applied
       traceSteps={traceSteps}
       statCards={statCards}
       checkProps={checkProps}
+      tooltipSections={tooltipSections}
     />
   );
 }

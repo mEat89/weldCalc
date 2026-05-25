@@ -143,7 +143,7 @@ export default function PlateRigidityTab({ activeTab, setActiveTab, tabs, setLeg
               type="button"
               style={{ height: "42px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", lineHeight: "1.2", whiteSpace: "normal", padding: "2px 4px", fontSize: "10px" }}
             >
-              {t.id === "hss" ? "HSS Weld" : t.id === "standard" ? "Standard Shape Weld" : "Plate Rigidity"}
+              {t.label}
             </button>
           ))}
         </nav>

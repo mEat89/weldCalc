@@ -142,8 +142,8 @@ export function useHSSCalculation(state) {
     title: `Group effective length [${LENGTH_METHODS.find((m) => m.id === lengthMode)?.short}]`,
     codeRef: "AISC 360-22 §K5 Eq. K5-5 — full weld group",
     traceSteps: [
-      { eq: `Branch transverse width, Bb = ${transverseLen.toFixed(3)} in`, codeRef: "Geometry orientation selected in sidebar", value: `${transverseLen.toFixed(3)} in` },
-      { eq: `Branch longitudinal height, Hb = ${parallelLen.toFixed(3)} in`, codeRef: "Longitudinal weld length used in §K5-5/K5-6", value: `${parallelLen.toFixed(3)} in` },
+      { eq: `Branch width, Bb = ${transverseLen.toFixed(3)} in`, codeRef: "AISC rectangular HSS convention: catalog B maps to Be/Bb", value: `${transverseLen.toFixed(3)} in` },
+      { eq: `Branch depth, Hb = ${parallelLen.toFixed(3)} in`, codeRef: "AISC rectangular HSS convention: catalog H maps to bending depth / longitudinal welds", value: `${parallelLen.toFixed(3)} in` },
       ...(k5 ? [
         { eq: `Be = min(Be_raw, Bb) = min(${k5.beRaw.toFixed(3)}, ${transverseLen.toFixed(3)})`, codeRef: connType === "hss2hss" ? "AISC §K5 Eq. K1-1" : "K5 Be engineering-judgment mode for HSS-to-plate", value: `${Be_for_sip.toFixed(3)} in` },
       ] : [

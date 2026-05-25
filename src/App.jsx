@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import HSSTab from "./components/tabs/HSSTab";
+import HSSLocalWeldTab from "./components/tabs/HSSLocalWeldTab";
 import StandardShapesTab from "./components/tabs/StandardShapesTab";
 import PlateRigidityTab from "./components/tabs/PlateRigidityTab";
 import LegendModal from "./components/modals/LegendModal";
 import ReferencesModal from "./components/modals/ReferencesModal";
 
 const TABS = [
-  { id: "hss",      label: "HSS Connections" },
-  { id: "standard", label: "Standard Shapes" },
-  { id: "rigidity", label: "Base Plate Rigidity" },
+  { id: "hss",      label: "HSS Weld" },
+  { id: "hssLocal", label: "HSS Local Weld" },
+  { id: "standard", label: "Standard Shape Weld" },
+  { id: "rigidity", label: "Plate Rigidity" },
 ];
 
 export default function App() {
@@ -58,6 +60,20 @@ export default function App() {
       {/* Main Tab Panels with grid layouts (mounted persistently to keep tab states) */}
       <div style={{ display: activeTab === "hss" ? "contents" : "none" }}>
         <HSSTab
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          tabs={TABS}
+          setLegendOpen={setLegendOpen}
+          setRefsOpen={setRefsOpen}
+          darkMode={darkMode}
+          toggleDarkMode={toggleDarkMode}
+          reportMeta={reportMeta}
+          setReportMeta={setReportMeta}
+        />
+      </div>
+
+      <div style={{ display: activeTab === "hssLocal" ? "contents" : "none" }}>
+        <HSSLocalWeldTab
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           tabs={TABS}

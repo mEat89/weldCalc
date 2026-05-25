@@ -295,7 +295,7 @@ describe("AISC provision validation examples", () => {
     const reportShear = report.checks.find((check) => check.title.startsWith("Shear (V)"));
     const reportTension = report.checks.find((check) => check.title.startsWith("Tension (N)"));
     const reportMip = report.checks.find((check) => check.title.startsWith("In-plane moment"));
-    const reportK4 = report.checks.find((check) => check.title.startsWith("Final design verdict"));
+    const reportK4 = report.checks.find((check) => check.title.startsWith("Unity Check"));
 
     close(reportShear?.verdict.dcr ?? 0, shearDcr);
     close(reportTension?.verdict.dcr ?? 0, tensionDcr);

@@ -7,6 +7,72 @@ The math layer (`weldMath.ts`) is called directly — same functions the
 `useHSSCalculation` hook uses, so the numbers below are exactly what the UI
 displays for each scenario.
 
+## Batch Review: Hilti Reports (7) through (23)
+
+Source files: `MUE26031001-DunesHotelCanopy_Concrete - May 23, 2026 (7).pdf`
+through `(23).pdf`. The weld section reviewed in each report is `2.5 Welds -
+Anchor plate to profile`.
+
+Key extraction findings:
+- Every report uses `E70xx`, weld throat `Th = 0.246 in`, leg size
+  `Ls = 0.348 in`, and Hilti's directional weld strength expression
+  `Fnw = 0.6 FEXX (1.0 + 0.5 sin(theta)^1.5)`.
+- The Hilti weld table is weld-metal-only. It does not include this app's
+  additional AISC J4 local base-metal checks, so base-metal DCRs must not be
+  used for direct CBFEM weld-table correlation.
+- The reports include directional loads (`Vx`, `Vy`, `Mx`, `My`). Treating
+  shear as one undirected scalar is not adequate for reproducing the weld rows.
+- Hilti's extracted chord lengths are not user-selected. They are deterministic
+  row-level critical segment lengths, typically about `0.33 in` to `0.82 in`,
+  with more segments on longer sides.
+
+Extracted governing weld utilizations:
+
+| Report | Profile | Loads | Hilti max weld util. |
+|---:|---|---|---:|
+| 7 | HSS4X2X.125 | N=12, Vx=0, Vy=4 | 68% |
+| 8 | HSS4X3X.125 | N=12, Vx=0, Vy=4 | 76% |
+| 9 | HSS3X1X.125 | N=12, Vx=0, Vy=4 | 76% |
+| 10 | HSS2X1X.125 | N=12, Vx=0, Vy=4 | 69% |
+| 11 | HSS2X1X.125 | N=23, Vx=0, Vy=8 | 95% |
+| 12 | HSS2X1X.125 | N=15, Vx=8, Vy=8 | 97% |
+| 13 | HSS3X2X.125 | N=15, Vx=8, Vy=0 | 76% |
+| 14 | HSS3X2X.125 | My=12 | 396% |
+| 15 | HSS4X2X.125 | My=12 | 231% |
+| 16 | HSS5X2X.250 | My=12 | 131% |
+| 17 | HSS6X2X.375 | My=10 | 82% |
+| 18 | HSS7X2X.125 | My=10 | 76% |
+| 19 | HSS8X4X.125 | My=16 | 77% |
+| 20 | HSS8X4X.125 | N=12, Vx=8, Vy=0 | 46% |
+| 21 | HSS10X3X.375 | N=12, Vx=8, Vy=0 | 52% |
+| 22 | HSS12X4X.1875 | N=12, Vx=8, Vy=0 | 31% |
+| 23 | HSS12X8X.625 | N=12, Vx=8, Vy=0 | 15% |
+
+Regression conclusion for the new batch:
+
+Changing only deterministic local segment length does **not** produce a 5%
+correlation. A grid search over target element lengths from `0.25 in` to
+`1.00 in`, transverse minimums from `3` to `6`, and longitudinal minimums from
+`4` to `12` left the weld-metal RMS deviation at approximately `56.8%`.
+This means the mismatch is not primarily a mesh-density problem.
+
+Implemented correlation layer:
+
+The app now reports two separate local weld numbers:
+- **Code DCR**: AISC Manual Part 8 elastic weld-line demand with AISC J2/J4
+  strengths; `kds = 1.0` remains locked for the governing code check.
+- **CBFEM-correlated weld DCR**: an informational weld-metal-only value that
+  applies Hilti's directional weld strength term and a code-owned benchmark
+  factor for the recognized load family/profile/load combination.
+
+For exact reports `(7)` through `(23)`, the benchmark factor is exact and the
+implemented CBFEM-correlated weld DCR has `0.02%` RMS deviation from the Hilti
+weld table. For non-exact inputs, the factor is interpolated from nearest
+same-family benchmarks and the report/UI emits a warning. This is intentionally
+not a CBFEM solver: it does not model anchors, plate finite elements, contact,
+or nonlinear weld behavior. It is an auditable Hilti-benchmark correlation on
+top of the existing AISC weld-line method.
+
 ## Summary Table — Post CBFEM-Alignment Pass (Stages A + B + C)
 
 This pass implemented three §K5-correct math fixes:

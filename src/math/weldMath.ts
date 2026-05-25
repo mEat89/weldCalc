@@ -509,8 +509,7 @@ export function calcMomentIpCapacity(input: MomentCapacityInput): MomentCapacity
 /**
  * AISC 360-22 §K5 — Total group capacity for axial and in-plane moment.
  * Combines Eq. K5-1 (axial via le) and Eq. K5-2 (moment via Sip) into a
- * single helper. Matches what Hilti PROFIS CBFEM reports as the headline
- * "Welds = X%" utilization.
+ * single helper for the HSS tab and report output.
  *
  * For HSS-to-HSS T-, Y-, and cross-connections (Table K5.1):
  *   le  = 2·Hb/sinθ + 2·Be           (Eq. K5-5)

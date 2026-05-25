@@ -58,8 +58,9 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
   const [plateT, setPlateT] = useState(0.5);
   const [plateGradeIdx, setPlateGradeIdx] = useState(0);
 
-  // Branch orientation
-  const [branchTransverseDim, setBranchTransverseDim] = useState("B");
+  // AISC rectangular HSS convention: B is the width across the weld group and
+  // H is the longitudinal/depth dimension used for §K5 group bending.
+  const branchTransverseDim = "B";
 
   // Weld parameters
   const [legSize, setLegSize] = useState(0.25);
@@ -163,7 +164,7 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
               type="button"
               style={{ height: "42px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", lineHeight: "1.2", whiteSpace: "normal", padding: "2px 4px", fontSize: "10px" }}
             >
-              {t.id === "hss" ? "HSS Weld" : t.id === "standard" ? "Standard Shape Weld" : "Plate Rigidity"}
+              {t.label}
             </button>
           ))}
         </nav>
@@ -254,27 +255,9 @@ export default function HSSTab({ activeTab, setActiveTab, tabs, setLegendOpen, s
             </div>
           )}
           <div style={{ display: "flex", flexDirection: "column", gap: "4px", borderTop: "1px dashed var(--border-color)", paddingTop: "8px", marginTop: "8px" }}>
-            <div className="card-section-label" style={{ margin: 0, paddingLeft: "6px", fontSize: "10px" }}>Group orientation</div>
-            <div className="toggle-btn-grid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: "6px" }}>
-              <button
-                onClick={() => setBranchTransverseDim("B")}
-                className={`toggle-option-btn compact ${branchTransverseDim === "B" ? "active" : ""}`}
-                type="button"
-                style={{ padding: "6px 8px", fontSize: "9.5px", borderRadius: "var(--radius-sm)", textAlign: "center" }}
-              >
-                <div className="btn-main-label" style={{ fontSize: "9.5px", fontWeight: "700" }}>B dimension is transverse to support axis</div>
-              </button>
-              <button
-                onClick={() => setBranchTransverseDim("H")}
-                className={`toggle-option-btn compact ${branchTransverseDim === "H" ? "active" : ""}`}
-                type="button"
-                style={{ padding: "6px 8px", fontSize: "9.5px", borderRadius: "var(--radius-sm)", textAlign: "center" }}
-              >
-                <div className="btn-main-label" style={{ fontSize: "9.5px", fontWeight: "700" }}>H dimension is transverse to support axis</div>
-              </button>
-            </div>
-            <div style={{ fontSize: "9.5px", color: "var(--text-muted)", lineHeight: "1.3", paddingLeft: "6px" }}>
-              Used only to map HSS dimensions into §K5 group terms: Be across the transverse side, Hb along the longitudinal welds.
+            <div className="card-section-label" style={{ margin: 0, paddingLeft: "6px", fontSize: "10px" }}>Weld group dimensions</div>
+            <div style={{ fontSize: "10px", color: "var(--text-muted)", lineHeight: "1.35", padding: "6px 8px", background: "var(--surface-subtle)", borderRadius: "var(--radius-sm)" }}>
+              Automatic AISC mapping: <strong>B = Be/Bb</strong> across the weld group, and <strong>H = Hb</strong> for bending depth and longitudinal weld length.
             </div>
           </div>
         </div>

@@ -44,7 +44,7 @@ export default function ReferencesModal({ onClose }) {
                       Sip = tw · [ Hb² / (3·sin²θ) + Be · Hb / sinθ ]<br />
                       Mn-ip = Fnw · Sip,   φMn-ip = 0.75 · Mn-ip
                     </div>
-                    The first Sip term is the webs' contribution (two parallel longitudinal welds bending about their strong axis); the second is the flanges' contribution (two transverse welds at distance Hb/(2·sinθ) from the neutral axis, with Be effective width per Eq. K1-1). Mn-ip is the connection-level flexural moment capacity — a single value for the whole weld group that correlates with Hilti CBFEM's headline %. For HSS-to-plate views this is shown as a tension/compression couple across the weld group, not as torsion about the HSS longitudinal axis.
+                    The first Sip term is the webs' contribution (two parallel longitudinal welds bending about their strong axis); the second is the flanges' contribution (two transverse welds at distance Hb/(2·sinθ) from the neutral axis, with Be effective width per Eq. K1-1). Mn-ip is the connection-level flexural moment capacity — a single value for the whole weld group. For HSS-to-plate views this is shown as a bending resultant at the weld group, not as torsion about the HSS longitudinal axis.
                   </li>
                   <li>
                     <strong>Strict Locking of k_ds = 1.0:</strong> The HSS group checks use k_ds = 1.0 for HSS branch welds per AISC 360-22 Table K5.1 user notes and §K5 commentary.
@@ -58,6 +58,12 @@ export default function ReferencesModal({ onClose }) {
                   </li>
                   <li>
                     <strong>Single Group Design Workflow:</strong> The HSS tab is a global weld-group checker. The diagram, inputs, report, and result cards all refer to the same model: the full weld group under V, N, and flexural in-plane M. Torsion about the HSS longitudinal axis is not included in this workflow.
+                  </li>
+                  <li>
+                    <strong>HSS-to-Plate Local Weld Discretization (AISC Manual Part 8):</strong> The separate local HSS-to-plate workflow discretizes the weld perimeter into read-only deterministic elements, distributes direct V/N and flexural M using elastic weld-group mechanics, and checks each segment with AISC §J2.4 weld metal plus §J4.1/§J4.2 base metal strength. Mesh density is controlled by tested code constants and is not user selectable.
+                  </li>
+                  <li>
+                    <strong>CBFEM Benchmark Guardrail:</strong> Hilti/IDEA-style finite element checks are used as correlation evidence, not as the legal design basis. For validated benchmark geometries, regression tests require local segment utilization to be at least the Hilti reported utilization. Outside that benchmark envelope, the app reports a limitation warning rather than claiming universal CBFEM conservatism.
                   </li>
                   <li>
                     <strong>Combined-Loading Unity Check (§K4-9):</strong> For the HSS actions currently supported by this app, the combined group check is:
@@ -131,6 +137,7 @@ export default function ReferencesModal({ onClose }) {
                   <li>§J2.2b &amp; Table J2.4 — Minimum and maximum fillet weld leg sizes based on thinner joined part thickness.</li>
                   <li>§J2.2b &amp; Eq. J2-1 — Longitudinal fillet weld length reduction factor β = 1.2 - 0.002 · (L/w) &le; 1.0 (when ratio exceeds 100). Capped at 0.60 for ratio &gt; 300.</li>
                   <li>§J2.4 &amp; Eq. J2-5 — Fillet weld metal shear strength; LRFD φ = 0.75. Directional factor kds locked to 1.0 for HSS connections per Chapter K Commentary, but available (up to 1.5) for standard shapes.</li>
+                  <li>AISC Manual Part 8 — Elastic weld-group analysis for local/eccentric line weld demand distribution; used by the HSS-to-plate local discretization workflow.</li>
                   <li>§J4.2 &amp; Eqs. J4-3 / J4-4 — Base metal shear yielding (φ = 1.00) and base metal shear rupture (φ = 0.75) limits.</li>
                   <li>§K1.2.2a &amp; Eq. K1-1 — Hollow Structural Section connection uneven stress effective width Be calculation for transverse walls.</li>
                   <li>§K5 Table K5.1 — Standardized effective weld lengths; parallel welds fully effective, transverse welds reduced to Be.</li>
